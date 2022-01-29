@@ -76,7 +76,9 @@ leaflet() %>%
 
 # raster data -------------------------------------------------------------
 # bias layer
-bias_layer <- geodata::travel_time(path = "data/travel_layer.tif")
+bias_layer <- geodata::travel_time(path = "data/travel_layer.tif",
+                                   size = 1,
+                                   up = TRUE)
 plot(bias_layer)
 
 # bioclim layers
