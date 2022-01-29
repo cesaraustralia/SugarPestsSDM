@@ -7,37 +7,71 @@ library(terra)
 
 # get species data --------------------------------------------------------
 # my species for modelling
-species <- c("Perkinsiella saccharicida", "Scirpophaga excerptalis")
-species[1]
+species <- c(
+  "Scirpophaga excerptalis",
+  "Sesamia grisescens",
+  "Chilo auricilius",
+  "Chilo infuscatellus",
+  "Eumetopina flavipes",
+  "Matsumuratettix hiroglyphicus",
+  "Yamatotettix flavovittatus",
+  "Perkinsiella saccharicida",
+  "Perkinsiella thompsoni"
+)
 
-# download GBIF occurrence data for this species; this takes time if there are many data points!
-gbif_data <- occ_data(scientificName = species[2], 
-                      hasCoordinate = TRUE, 
-                      limit = 2000)
+get_species <- function(x, genus = FALSE){
+  out <- x %>% 
+    str_split(" ") %>% 
+    unlist()
+  if(genus){
+    return(out[1])
+  } else{
+    out[2]
+  }
+}
 
-# take a look at the downloaded data:
-gbif_data
+splist <- list()
+for(i in seq_along(species)){
+  
+  gbif_data <- geodata::sp_occurrence(genus = get_species(species[i], TRUE), 
+                                      species = get_species(species[i], FALSE))
+  
+  # take a look at the downloaded data:
+  # gbif_data %>% View()
+  
+  if(is.null(gbif_data)) next
+  
+  sp_coords <- gbif_data %>% 
+    dplyr::select(lon, lat, status = occurrenceStatus, 
+                  country, species, genus, family) %>% 
+    drop_na(lon, lat)
+  
+  sp_points <- st_as_sf(sp_coords, coords = c("lon", "lat"))
+  # sp_points
+  
+  splist[[i]] <- sp_points
+}
+
+# combine all species data
+sp_all <- splist %>% 
+  do.call(bind_rows, .)
 
 
-# get the columns that matter for mapping and cleaning the occurrence data:
-sp_coords <- gbif_data$data %>% 
-  dplyr::select(decimalLongitude, decimalLatitude, individualCount,
-                occurrenceStatus, coordinateUncertaintyInMeters, institutionCode,
-                references) %>% 
-  mutate(long = decimalLongitude,
-         lat = decimalLatitude)
-
-myspecies_coords
-
-
-
-sp_points <- st_as_sf(sp_coords, coords = c("long", "lat"))
-sp_points
-
-
+species_palette <- colorFactor(palette = viridis::inferno(unique(sp_all$species)),
+                               domain = unique(sp_all$species))
 leaflet() %>% 
   addTiles() %>% 
-  addMarkers(data = sp_points)
+  # addMarkers(data = sp_points)
+  addCircleMarkers(
+    data = sp_all,
+    radius = 6,
+    stroke = FALSE,
+    label = ~species,
+    color = ~species_palette(species),
+    fillOpacity = 0.4
+  )
+
+
 
 
 # raster data -------------------------------------------------------------
@@ -74,5 +108,16 @@ mapview(r)
 
 
 
+# # download GBIF occurrence data for this species; this takes time if there are many data points!
+# gbif_data <- occ_data(scientificName = species[2], 
+#                       hasCoordinate = TRUE, 
+#                       limit = 20000)
+# # get the columns that matter for mapping and cleaning the occurrence data:
+# sp_coords <- gbif_data$data %>% 
+#   dplyr::select(decimalLongitude, decimalLatitude, individualCount,
+#                 occurrenceStatus, coordinateUncertaintyInMeters, institutionCode,
+#                 references) %>% 
+#   mutate(long = decimalLongitude,
+#          lat = decimalLatitude)
 
 

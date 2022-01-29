@@ -1,22 +1,6 @@
 FROM rocker/shiny:4.1.2
 LABEL Maintainer="rvalavi@cesaraustralia.com"
 
-# install libraries of general use
-RUN apt-get update -qq && apt-get -y --no-install-recommends install \
-    libxml2-dev \
-    libcairo2-dev \
-    libsqlite3-dev \
-    libmysqlclient-dev \
-    libpq-dev \
-    libssh2-1-dev \
-    unixodbc-dev \
-    libcurl4-openssl-dev \
-    libssl-dev \
-    texlive \
-    texlive-latex-extra \
-    libgit2-dev \
-    git
-
 # install goespatial libraries
 RUN apt-get update -qq && apt-get -y --no-install-recommends install \
     libgdal-dev \
@@ -28,8 +12,7 @@ RUN apt-get update -qq && apt-get -y --no-install-recommends install \
     libudunits2-dev \
     libhdf5-dev \
     libnetcdf-dev \
-    netcdf-bin \
-    libjq-dev # for googleway
+    netcdf-bin
 
 ## update system libraries
 RUN apt-get update && \
