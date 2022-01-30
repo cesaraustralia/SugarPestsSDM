@@ -84,20 +84,20 @@ leaflet() %>%
 
 
 # raster data -------------------------------------------------------------
-# bias layer
+# download bias layer
 bias_layer <- geodata::travel_time(path = "data/travel_layer.tif",
                                    size = 1,
                                    up = TRUE)
 plot(bias_layer)
 
-# bioclim layers
-clim <- geodata::worldclim_global(var = "tmin", 
-                                  res = 0.5, 
-                                  path = "data/bioclim.tif")
-plot(clim)
+# download bioclim layers
+bioclim <- geodata::worldclim_global(var = "bio", 
+                                     res = 0.5, 
+                                     path = "data/bioclim.tif")
+plot(bioclim)
 
 
-plot(clim[[1]])
+plot(bioclim[[1]])
 plot(sp_points$geometry, add = TRUE)
 
 leaflet() %>% 

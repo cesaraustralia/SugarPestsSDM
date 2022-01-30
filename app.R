@@ -104,11 +104,13 @@ server <- function(input, output){
   })
   
   output$select2 <- renderUI({
-    selectizeInput(inputId = "select_map2", 
-                   label = "Select prediction map",
-                   options = list(dropdownParent = 'body',
-                                  create = 0),
-                   choices = c("P. saccharicida"))
+    if(input$split){
+      selectizeInput(inputId = "select_map2", 
+                     label = "Select prediction map",
+                     options = list(dropdownParent = 'body',
+                                    create = 0),
+                     choices = c("P. saccharicida"))
+    }
   })
   
   output$maps <- renderUI({
@@ -117,7 +119,7 @@ server <- function(input, output){
       leafsync::sync(mapview(r), mapview(r), no.initial.sync = TRUE)
       
     } else{
-      renderMapview(mapview::mapView(r))
+      renderLeaflet(mapview::mapview(r)$map)
     }
     
   })
