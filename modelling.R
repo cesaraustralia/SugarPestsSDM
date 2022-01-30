@@ -4,7 +4,6 @@ library(tidyverse)
 library(sf)
 library(terra)
 
-
 # get species data --------------------------------------------------------
 # my species for modelling
 species <- c(
@@ -30,6 +29,7 @@ get_species <- function(x, genus = FALSE){
   }
 }
 
+
 splist <- list()
 for(i in seq_along(species)){
   
@@ -46,18 +46,27 @@ for(i in seq_along(species)){
                   country, species, genus, family) %>% 
     drop_na(lon, lat)
   
+  if(nrow(sp_coords) < 2) next
+  
   sp_points <- st_as_sf(sp_coords, coords = c("lon", "lat"))
   # sp_points
   
   splist[[i]] <- sp_points
 }
 
+# check the number of species
+unlist(map(splist, nrow))
+
 # combine all species data
 sp_all <- splist %>% 
-  do.call(bind_rows, .)
+  do.call(bind_rows, .) %>% 
+  st_set_crs(4326)
+
+head(sp_all)
+nrow(sp_all)
 
 
-species_palette <- colorFactor(palette = viridis::inferno(unique(sp_all$species)),
+species_palette <- colorFactor(palette = viridis::inferno(length(unique(sp_all$species))),
                                domain = unique(sp_all$species))
 leaflet() %>% 
   addTiles() %>% 

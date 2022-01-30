@@ -8,6 +8,7 @@ library(leaflet)
 library(leafsync)
 # library(terra)
 library(mapview)
+library(shinyWidgets)
 
 # # example raster
 # r <- terra::rast("data/travel_layer.tif/travel_time_to_cities_1.tif") %>%
@@ -25,10 +26,14 @@ r[r > 50000] <- NA
 #     # addMarkers(lng=x[1], lat=x[2], popup="The birthplace of R")
 #   m
 # }
+# y <- c(174.968, 37.852)
+# x <- c(0.112281, 51.523001)
 
-y <- c(174.968, 37.852)
-x <- c(0.112281, 51.523001)
-
+## read species data
+sp_all <- sf::st_read("data/species_data.gpkg")
+# set a color palette
+species_palette <- colorFactor(palette = viridis::inferno(length(unique(sp_all$species))),
+                               domain = unique(sp_all$species))
 
 ui <- shinyUI(
   navbarPage("Sugar Biosecurity",
@@ -39,23 +44,35 @@ ui <- shinyUI(
              tabPanel(
                "Prediction maps",
 
-               selectInput(inputId = "select_map", 
-                           label = "Select prediction map", 
-                           choices = c("P. saccharicida")),
+               splitLayout(
+
+                 selectizeInput(inputId = "select_map1", 
+                                label = "Select prediction map",
+                                options = list(dropdownParent = 'body',
+                                               create = 0),
+                                choices = c("P. saccharicida")),
+                 
+                 switchInput(inputId = "split", 
+                             label = "Split view", 
+                             value = FALSE),
+                 
+                 uiOutput("select2")
+                 # checkboxInput(inputId = "split", 
+                 #               label = "Split view", 
+                 #               value = FALSE, 
+                 #               width = NULL)
+               ),
                
-               leafletOutput("map")
+               # map prediction map
+               uiOutput("maps")
                       
              ),
 
              # Panel 2 -----------------------------------------------------------------
              tabPanel(
-               "Compare maps",
+               "Species maps",
                
-               selectInput(inputId = "select_map", 
-                           label = "Select left map", 
-                           choices = c("P. saccharicida")),
-               
-               uiOutput(outputId = "maps")
+               leafletOutput("map", height = 600)
                
              ),
              
@@ -72,12 +89,36 @@ ui <- shinyUI(
 server <- function(input, output){
   
   output$map <- renderLeaflet({
-   leaflet() %>% 
-      addTiles()
+    leaflet() %>% 
+      addTiles() %>% 
+      # addMarkers(data = sp_points)
+      addCircleMarkers(
+        data = sp_all,
+        radius = 6,
+        stroke = FALSE,
+        label = ~species,
+        color = ~species_palette(species),
+        fillOpacity = 0.4
+      )
+      
+  })
+  
+  output$select2 <- renderUI({
+    selectizeInput(inputId = "select_map2", 
+                   label = "Select prediction map",
+                   options = list(dropdownParent = 'body',
+                                  create = 0),
+                   choices = c("P. saccharicida"))
   })
   
   output$maps <- renderUI({
-    leafsync::sync(mapview(r), mapview(r), no.initial.sync = TRUE)
+    
+    if(input$split){
+      leafsync::sync(mapview(r), mapview(r), no.initial.sync = TRUE)
+      
+    } else{
+      renderMapview(mapview::mapView(r))
+    }
     
   })
   
