@@ -2,5 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
-data/
-data/*
+data/*.tif
+data/*-shm
+data/*-wal
+data/admin
+data/admin/*
