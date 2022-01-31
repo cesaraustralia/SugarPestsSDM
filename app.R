@@ -11,23 +11,9 @@ library(mapview)
 library(shinyWidgets)
 
 # # example raster
-# r <- terra::rast("data/travel_layer.tif/travel_time_to_cities_1.tif") %>%
-#   terra::crop(d) %>%
-#   terra::aggregate(facet = 5) %>%
-#   raster::raster()
-# plot(r)
 r <- raster::raster("data/toyraster.tif")
 r[r > 50000] <- NA
 
-# my_map <- function(x){
-#   m <- leaflet() %>%
-#     addTiles() %>%  # Add default OpenStreetMap map tiles
-#     addRasterImage(x, opacity = 0.8)
-#     # addMarkers(lng=x[1], lat=x[2], popup="The birthplace of R")
-#   m
-# }
-# y <- c(174.968, 37.852)
-# x <- c(0.112281, 51.523001)
 
 ## read species data
 sp_all <- sf::st_read("data/species_data.gpkg")
@@ -79,7 +65,7 @@ ui <- shinyUI(
 
              # Panel 3 -----------------------------------------------------------------
              tabPanel("Info",
-               HTML("Some information about modelling and species data comes here!")
+               includeHTML("modelling_info.html")
              )
              
   )

@@ -1,0 +1,42 @@
+---
+title: "Modelling Sugar Cane Pests Distribution"
+author: "Roozbeh Valavi"
+date: "31/01/2022"
+output:
+  html_document:
+    css: theme.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+## Species data
+### Occurrence data
+Species data are extracted from the GBIF ([gbif.org](https://www.gbif.org)) database. The records are checked against the knows distribution of each pest in CABI ([cabi.org](https://www.cabi.org)) database.
+
+
+### Background sample
+The model the species presence-only data with statistical models a random sample of background data is extracted from the landscape of interest. To taken to account for the possible observation bias in the occurrence data we used a bias layer. The bias layer is created by a density estimation of species Target Group, known as TGB, as described by Valavi et al. (2021), here the data for the *genus* of all species. The TGB data are cropped to the study are and records outside of this area is discarded.
+
+
+```{r}
+knitr::include_graphics("figs/tgbs.jpg")
+
+```
+
+
+## Species distribution modelling
+The records are low ...
+
+A Hierarchical Generalized Additive Model (**HGAM**; Pearson et al. 2019) with *point process weighting* (Fithian & Hastie 2013) was used to model the species.
+
+
+
+
+
+
+
+
+## References
+

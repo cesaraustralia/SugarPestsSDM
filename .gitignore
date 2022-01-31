@@ -7,3 +7,4 @@ data/*-shm
 data/*-wal
 data/admin
 data/admin/*
+data/*-journal
