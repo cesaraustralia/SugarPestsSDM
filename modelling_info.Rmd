@@ -1,5 +1,5 @@
 ---
-title: "Modelling Sugar Cane Pests Distribution"
+title: "Modelling sugar cane pests distribution"
 author: "Roozbeh Valavi"
 date: "31/01/2022"
 output:

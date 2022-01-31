@@ -1,6 +1,6 @@
-# library(tidyverse)
-# library(mgcv)
-# library(terra)
-# 
-# 
-# 
+library(tidyverse)
+library(mgcv)
+library(terra)
+
+
+

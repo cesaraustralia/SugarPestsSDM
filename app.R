@@ -1,14 +1,15 @@
 # remotes::install_github("Appsilon/shiny.react")
 # remotes::install_github("Appsilon/shiny.fluent")
 library(tidyverse)
-library(shiny)
 # library(shiny.fluent)
+library(shiny)
 library(shinythemes)
+library(shinyWidgets)
 library(leaflet)
 library(leafsync)
-# library(terra)
 library(mapview)
-library(shinyWidgets)
+library(raster)
+# library(terra)
 
 # # example raster
 r <- raster::raster("data/toyraster.tif")
@@ -43,10 +44,7 @@ ui <- shinyUI(
                              value = FALSE),
                  
                  uiOutput("select2")
-                 # checkboxInput(inputId = "split", 
-                 #               label = "Split view", 
-                 #               value = FALSE, 
-                 #               width = NULL)
+                 
                ),
                
                # map prediction map
@@ -65,7 +63,8 @@ ui <- shinyUI(
 
              # Panel 3 -----------------------------------------------------------------
              tabPanel("Info",
-               includeHTML("modelling_info.html")
+               htmlOutput("info")
+               
              )
              
   )
@@ -109,6 +108,12 @@ server <- function(input, output){
     }
     
   })
+  
+  # render HTML page
+  getPage <- function(){
+    return(includeHTML("modelling_info.html"))
+  }
+  output$info <- renderUI({ getPage() })
   
 }
 
