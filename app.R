@@ -19,7 +19,7 @@ r[r > 50000] <- NA
 ## read species data
 sp_all <- sf::st_read("data/species_data.gpkg")
 # set a color palette
-species_palette <- colorFactor(palette = viridis::inferno(length(unique(sp_all$species))),
+sp_palette <- colorFactor(palette = viridis::inferno(length(unique(sp_all$species))),
                                domain = unique(sp_all$species))
 
 ui <- shinyUI(
@@ -77,14 +77,19 @@ server <- function(input, output){
   output$map <- renderLeaflet({
     leaflet() %>% 
       addTiles() %>% 
-      # addMarkers(data = sp_points)
       addCircleMarkers(
         data = sp_all,
         radius = 6,
         stroke = FALSE,
         label = ~species,
-        color = ~species_palette(species),
+        color = ~sp_palette(species),
         fillOpacity = 0.4
+      ) %>% 
+      addLegend(position = "bottomleft", 
+                pal = sp_palette,
+                values = sp_all$species,
+                title = "Species",
+                opacity = 0.8
       )
       
   })
