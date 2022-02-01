@@ -1,4 +1,4 @@
-library(rgbif)
+# library(rgbif)
 library(leaflet)
 library(tidyverse)
 library(sf)
@@ -122,11 +122,95 @@ bioclim <- terra::rast(fls)
 plot(bioclim)
 
 bg_mask <- st_read("data/background_mask.gpkg")
+plot(st_geometry(bg_mask))
 
-# mask bioclim layers
-bg_rasters <- terra::crop(bioclim, bg_mask)
-plot(bg_raster)
-terra::writeRaster(bio_aus, bylayer = TRUE)
+# mask raster layers one-by-one
+for(i in 15:nlyr(bioclim)){
+  masked <- terra::mask(bioclim[[i]], vect(bg_mask))
+  terra::writeRaster(masked, paste0("data/bg_layers/", names(bioclim)[i], ".tif"))
+  print(i)
+}
+
+
+# KDE for background sampling ---------------------------------------------
+# loading required libraries
+library(spatialEco)
+library(terra)
+library(disdat)
+library(dismo)
+library(sf)
+
+# read TGB data
+tgbs <- st_read("data/tgbs.gpkg")
+# read a raster mask for the region
+rs <- terra::rast("data/bg_layers/wc2.1_30s_bio_1.tif")
+
+plot(rs)
+plot(st_geometry(tgbs), add = TRUE, pch = 16, cex = 0.3)
+
+# remove duplicated points in raster cells
+samplecellID <- terra::cellFromXY(rs, st_coordinates(tgbs)) 
+dup <- duplicated(samplecellID)
+tgbsp <- tgbs[!dup, ]
+
+nrow(tgbs)
+nrow(tgbsp)
+# st_write(tgbsp, "data/tgbs_reduced.gpkg")
+
+tgb_kde <- spatialEco::sp.kde(x = sf::as_Spatial(tgbsp),
+                              bw = 5, # degree
+                              newdata = raster::raster(rs),
+                              standardize = TRUE,
+                              scale.factor = 10000)
+plot(tgb_kde)
+
+
+# create background data with accessibility bias --------------------------
+library(dismo)
+
+# read species data
+sp_all <- st_read("data/species_data.gpkg")
+# accessibility map
+access <- terra::rast("data/accessibility_masked.tif")
+plot(access)
+setMinMax(access)
+
+# standardize the map
+rmin <- terra::minmax(access)[1]
+rmax <- terra::minmax(access)[2]
+access_std <- (rmax - access) / (rmax - rmin)
+plot(access_std)
+
+## calculate the distance map
+access_agg <- terra::aggregate(x = access_std, facet = 5)
+plot(access_agg)
+
+bgmask <- raster::raster(access_agg)
+raster::writeRaster(bgmask, "data/admin/bmask.tif")
+# bgmask <- terra::spatSample(access_std, 
+#                             size = 1000000, 
+#                             as.raster = fals,
+#                             method = "random") %>% 
+#   raster::raster()
+
+# create sparate bg records for each species
+bg_df <- data.frame()
+for(i in seq_along(unique(sp_all$species))){
+  
+  samples <- dismo::randomPoints(bgmask, 
+                                 n = 10000, 
+                                 prob = TRUE)
+  bg_df <- samples %>% 
+    as.data.frame() %>%
+    mutate(species = unique(sp_all$species)[i]) %>% 
+    bind_rows(bg_df)
+  
+}
+
+nrow(bg_df)
+
+
+
 
 
 

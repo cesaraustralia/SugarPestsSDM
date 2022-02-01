@@ -2,6 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+*.tif
 data/*.tif
 data/*-shm
 data/*-wal

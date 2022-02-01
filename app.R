@@ -39,9 +39,10 @@ ui <- shinyUI(
                                                create = 0),
                                 choices = c("P. saccharicida")),
                  
-                 switchInput(inputId = "split", 
-                             label = "Split view", 
+                 switchInput(inputId = "split",
+                             inline = FALSE,
                              value = FALSE),
+
                  
                  uiOutput("select2")
                  
