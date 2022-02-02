@@ -167,6 +167,7 @@ plot(tgb_kde)
 
 # create background data with accessibility bias --------------------------
 library(dismo)
+library(sf)
 
 # read species data
 sp_all <- st_read("data/species_data.gpkg")
@@ -178,36 +179,82 @@ setMinMax(access)
 # standardize the map
 rmin <- terra::minmax(access)[1]
 rmax <- terra::minmax(access)[2]
+rmin; rmax;
 access_std <- (rmax - access) / (rmax - rmin)
 plot(access_std)
 
-## calculate the distance map
-access_agg <- terra::aggregate(x = access_std, facet = 5)
-plot(access_agg)
+# ## calculate the distance map
+# access_agg <- terra::aggregate(x = access_std, facet = 5) %>% 
+#   raster::raster(access_agg)
+# raster::writeRaster(access_agg, "data/admin/bmask.tif")
 
-bgmask <- raster::raster(access_agg)
-raster::writeRaster(bgmask, "data/admin/bmask.tif")
+
+## system can't handle this large raster
+## sample the raster to reduce time
+tm <- Sys.time()
+bmask <- raster::sampleRegular(raster(access_std), 
+                               size = 1e7, 
+                               asRaster = TRUE)
+Sys.time() - tm
+plot(bmask)
+
+rmin <- raster::minValue(bmask)
+rmax <- raster::maxValue(bmask)
+rmin; rmax;
+bg_mask_std <- (bmask - rmin) / (rmax - rmin)
+plot(bg_mask_std)
+
+raster::minValue(bg_mask_std)
+raster::maxValue(bg_mask_std)
+
 # bgmask <- terra::spatSample(access_std, 
 #                             size = 1000000, 
 #                             as.raster = fals,
 #                             method = "random") %>% 
 #   raster::raster()
-
 # create sparate bg records for each species
 bg_df <- data.frame()
+tm <- Sys.time()
 for(i in seq_along(unique(sp_all$species))){
   
-  samples <- dismo::randomPoints(bgmask, 
+  samples <- dismo::randomPoints(bmask, 
                                  n = 10000, 
                                  prob = TRUE)
+  
   bg_df <- samples %>% 
     as.data.frame() %>%
     mutate(species = unique(sp_all$species)[i]) %>% 
     bind_rows(bg_df)
   
+  print(unique(sp_all$species)[i])
 }
+Sys.time() - tm
 
+head(bg_df)
 nrow(bg_df)
+
+# combine background data with species data
+sp_all <- sp_all %>% 
+  mutate(wt = 1) %>% 
+  dplyr::select(species, wt)
+
+species_data <- bg_df %>% 
+  mutate(wt = 10000) %>% 
+  st_as_sf(coords = c("x", "y")) %>% 
+  bind_rows(sp_all, .)
+head(species_data)
+nrow(species_data)
+
+# st_write(species_data, "data/species_data.gpkg")
+
+
+
+
+
+
+
+
+
 
 
 
