@@ -2,33 +2,250 @@ library(tidyverse)
 library(mgcv)
 library(terra)
 
+# modelling with covariates -----------------------------------------------
+spname <- "Perkinsiella saccharicida"
+
+modelA <- bam(
+  occ ~ s(bio_04, bs  = "tp", k = 10) +
+    s(bio_05, bs  = "tp", k = 10) +
+    s(bio_06, bs  = "tp", k = 10) +
+    s(bio_12, bs  = "tp", k = 10) +
+    s(bio_15, bs  = "tp", k = 10),
+  data = model_data[model_data$species == spname, ],
+  method = "fREML",
+  family = binomial(link = "cloglog"), 
+  weights = model_data$wt[model_data$species == spname],
+  discrete = TRUE,
+  control = gam.control(trace = FALSE), 
+  drop.unused.levels = FALSE
+)
+
+summary(modelA)
+gratia::draw(modelA)
+
+gam.check(modelA)
 
 
-modPS <- bam(pts ~ s(open_prop, bs = "tp", k = 15, m = 2) + 
-              s(open_prop, ID, bs = "fs", m = 1) + 
-              s(demRange, bs = "tp", k = 15, m = 2) + 
-              s(demRange, ID, bs = "fs", m = 1), 
-            data = data, 
-            method = "fREML", 
-            family = binomial(link = "cloglog"), 
-            weights = w, 
-            discrete = TRUE, 
-            control = gam.control(trace = FALSE), 
-            drop.unused.levels = FALSE)
+
+modelP <- bam(
+  occ ~ s(species, bs = "re") +
+    s(bio_04, bs  = "tp", k = 10) +
+    s(bio_05, bs  = "tp", k = 10) +
+    s(bio_06, bs  = "tp", k = 10) +
+    s(bio_12, bs  = "tp", k = 10) +
+    s(bio_15, bs  = "tp", k = 10),
+  data = model_data,
+  method = "fREML",
+  family = binomial(link = "cloglog"), 
+  weights = model_data$wt,
+  discrete = TRUE,
+  control = gam.control(trace = FALSE), 
+  drop.unused.levels = FALSE
+)
+
+summary(modelP)
+gratia::draw(modelP)
+
+gam.check(modelP)
 
 
-modPS2 <- gam(pts ~ s(open_prop, bs="tp", k=15, m=2) +
-                t2(open_prop, ID, bs=c("tp","re"), ord=2, m=1) +
-                s(open_prop, ID, bs="re") +
-                s(demRange, bs="tp", k=15, m=2) +
-                t2(demRange, ID, bs=c("tp","re"), ord=2, m=1) +
-                s(demRange, ID, bs="re") +
-                s(ID, bs="re"), 
-              data = data,
-              method = "REML",
-              family = binomial(link = "cloglog"), 
-              weights = w, 
-              discrete = FALSE,
-              control = gam.control(trace = FALSE), 
-              drop.unused.levels = FALSE)
+
+modelPS <- bam(
+  occ ~ s(bio_04, bs = "tp", k = 10, m = 2) +
+    s(bio_04, species, bs = "fs", m = 1) +
+    s(bio_05, bs = "tp", k = 10, m = 2) +
+    s(bio_05, species, bs = "fs", m = 1) +
+    # s(bio_06, bs = "tp", k = 10, m = 2) +
+    # s(bio_06, species, bs = "fs", m = 1) +
+    s(bio_12, bs = "tp", k = 10, m = 2) +
+    s(bio_12, species, bs = "fs", m = 1),
+    # s(bio_15, bs = "tp", k = 10, m = 2) +
+    # s(bio_15, species, bs = "fs", m = 1),
+  data = model_data,
+  method = "fREML",
+  family = binomial(link = "cloglog"),
+  weights = model_data$wt,
+  # select = TRUE,
+  discrete = TRUE,
+  control = gam.control(trace = FALSE), 
+  drop.unused.levels = FALSE
+)
+
+summary(modelPS)
+# gratia::draw(modelPS)
+plot(modelPS, pages = 1, rug = FALSE, shade = TRUE)
+
+gam.check(modelPS)
+
+
+# data.frame(
+#   mod1 = predict(modelPS, type = "response")[1:6],
+#   mod2 = predict(modelPS, type = "response", exclude = "s(species)")[1:6],
+#   mod3 = predict(modelPS, newdata = head(model_data)[,1:8], type = "response")
+# )
+
+# spatial prediction ------------------------------------------------------
+covar <- c("wc2.1_30s_bio_4.tif", "wc2.1_30s_bio_5.tif",
+           "wc2.1_30s_bio_6.tif", "wc2.1_30s_bio_12.tif",
+           "wc2.1_30s_bio_15.tif")
+
+extr <- c(
+  xmin = 60,
+  xmax = 180,
+  ymin = -45,
+  ymax = 54
+)
+
+rst <- rast(paste0("data/bg_layers/", covar)) %>% 
+  setNames(c("bio_04", "bio_05", "bio_06", "bio_12", "bio_15")) %>% 
+  terra::crop(extr) %>% 
+  terra::aggregate(facet = 5)
+
+plot(rst)
+
+# make species raster
+spname <- "Perkinsiella saccharicida"
+r <- rst[[1]]
+r[] <- spname
+spr <- mask(r, rst[[1]])
+names(spr) <- "species"
+plot(spr)
+
+rast_pred <- c(rst, spr)
+plot(rast_pred)
+
+facts <- list(species = levels(as.factor(model_data$species)))
+prediction <- terra::predict(object = rast_pred,
+                             model = modelPS, 
+                             # type = "response",
+                             factors = facts)
+plot(prediction)
+plot(exp(prediction))
+plot(terra::app(prediction, fun = plogis))
+
+plot(st_geometry(sp_all[sp_all$species == spname, ]), add = TRUE)
+
+
+
+# -------------------------------------------------------------------------
+# modelling with pca ------------------------------------------------------
+spname <- "Perkinsiella saccharicida"
+
+modelA <- bam(
+  occ ~ s(PC1, bs  = "tp", k = 10) +
+    s(PC2, bs  = "tp", k = 10) +
+    s(PC3, bs  = "tp", k = 10) +
+    s(PC4, bs  = "tp", k = 10),
+  data = model_data[model_data$species == spname, ],
+  method = "fREML",
+  family = binomial(link = "cloglog"), 
+  weights = model_data$wt[model_data$species == spname],
+  discrete = TRUE,
+  control = gam.control(trace = FALSE), 
+  drop.unused.levels = FALSE
+)
+
+summary(modelA)
+gratia::draw(modelA)
+
+gam.check(modelA)
+
+# get number of backgrounds
+num_bg <- as.numeric(table(model_data$occ)[1])
+
+modelP <- gam(
+  occ ~ s(species, bs = "re") +
+    s(PC1, bs  = "tp", k = 10) +
+    s(PC2, bs  = "tp", k = 10) +
+    s(PC3, bs  = "tp", k = 10) +
+    s(PC4, bs  = "tp", k = 10),
+  data = model_data,
+  method = "REML",
+  family = binomial(link = "cloglog"), 
+  weights = model_data$wt,
+  # weights = ifelse(model_data$occ == 1, 1, 1 / 10000)
+  # discrete = TRUE,
+  # control = gam.control(trace = FALSE), 
+  # drop.unused.levels = FALSE
+)
+
+summary(modelP)
+gratia::draw(modelP)
+
+gam.check(modelP)
+
+
+
+modelPS <- bam(
+  occ ~ s(PC1, bs = "tp", k = 10, m = 2) +
+    s(PC1, species, bs = "fs", m = 1) +
+    s(PC2, bs = "tp", k = 10, m = 2) +
+    s(PC2, species, bs = "fs", m = 1) +
+    s(PC3, bs = "tp", k = 10, m = 2) +
+    s(PC3, species, bs = "fs", m = 1) +
+    s(PC4, bs = "tp", k = 10, m = 2) +
+    s(PC4, species, bs = "fs", m = 1),
+  data = model_data,
+  method = "fREML",
+  family = binomial(link = "cloglog"),
+  weights = model_data$wt,
+  # select = TRUE,
+  discrete = TRUE,
+  control = gam.control(trace = FALSE), 
+  drop.unused.levels = FALSE
+)
+
+summary(modelPS)
+# gratia::draw(modelPS)
+plot(modelPS, pages = 1, rug = FALSE, shade = TRUE)
+
+gam.check(modelPS)
+
+
+
+# spatial prediction ------------------------------------------------------
+extr <- c(
+  xmin = 60,
+  xmax = 180,
+  ymin = -45,
+  ymax = 54
+)
+
+rst <- rast_pca %>% 
+  terra::crop(extr) %>% 
+  terra::aggregate(facet = 5)
+
+plot(rst)
+
+# make species raster
+spname <- "Perkinsiella saccharicida"
+r <- rst[[1]]
+r[] <- spname
+spr <- mask(r, rst[[1]])
+names(spr) <- "species"
+plot(spr)
+
+rast_pred <- c(rst, spr)
+plot(rast_pred)
+
+facts <- list(species = levels(as.factor(model_data$species)))
+prediction <- terra::predict(object = rast_pred,
+                             model = modelPS, 
+                             # type = "response",
+                             factors = facts)
+plot(prediction)
+plot(terra::app(prediction, fun = plogis))
+plot((exp(prediction) * 25000))
+
+plot(st_geometry(sp_all[sp_all$species == spname, ]), add = TRUE)
+
+# plot in mapview
+newpred <- raster::raster(exp(prediction) * 25000)
+# raster::writeRaster(newpred, "predictions//P_saccharicida.tif", overwrite = TRUE)
+mapview::mapview(list(newpred), 
+                 col.regions = terrain.colors(10, rev = TRUE),
+                 na.color = NA)
+
+
+
 

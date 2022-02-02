@@ -2,8 +2,8 @@
 .Rhistory
 .RData
 .Ruserdata
-*.tif
 data/*.tif
+data/bg_layers/*
 data/*-shm
 data/*-wal
 data/admin

@@ -170,7 +170,7 @@ library(dismo)
 library(sf)
 
 # read species data
-sp_all <- st_read("data/species_data.gpkg")
+sp_all <- st_read("data/occ_data.gpkg")
 # accessibility map
 access <- terra::rast("data/accessibility_masked.tif")
 plot(access)
@@ -235,12 +235,23 @@ nrow(bg_df)
 
 # combine background data with species data
 sp_all <- sp_all %>% 
-  mutate(wt = 1) %>% 
-  dplyr::select(species, wt)
+  mutate(occ = 1,
+         wt = 1) %>% 
+  dplyr::select(occ, species, wt)
+
+# function to rename geometry column in sf
+rename_geometry <- function(g, name){
+  current = attr(g, "sf_column")
+  names(g)[names(g)==current] = name
+  st_geometry(g)=name
+  g
+}
 
 species_data <- bg_df %>% 
-  mutate(wt = 10000) %>% 
-  st_as_sf(coords = c("x", "y")) %>% 
+  mutate(occ = 0, 
+         wt = 10000) %>% 
+  st_as_sf(coords = c("x", "y")) %>%
+  rename_geometry(name = "geom") %>% 
   bind_rows(sp_all, .)
 head(species_data)
 nrow(species_data)
@@ -248,12 +259,73 @@ nrow(species_data)
 # st_write(species_data, "data/species_data.gpkg")
 
 
+# extract data ------------------------------------------------------------
+list.files("data/bg_layers/")
+
+covar <- c("wc2.1_30s_bio_4.tif", "wc2.1_30s_bio_5.tif",
+           "wc2.1_30s_bio_6.tif", "wc2.1_30s_bio_12.tif",
+           "wc2.1_30s_bio_15.tif")
+
+rst <- rast(paste0("data/bg_layers/", covar)) %>% 
+  setNames(c("bio_04", "bio_05", "bio_06", "bio_12", "bio_15"))
+plot(rst)
+
+# create the training date for modelling
+model_data <- terra::extract(rst, vect(species_data)) %>% 
+  mutate(occ = species_data$occ,
+         species = as.factor(species_data$species),
+         wt = species_data$wt) %>% 
+  drop_na()
+
+head(model_data)
+nrow(model_data)
+table(model_data$occ)
 
 
+# pca ---------------------------------------------------------------------
+# covar <- c("wc2.1_30s_bio_4.tif", "wc2.1_30s_bio_5.tif",
+#            "wc2.1_30s_bio_6.tif", "wc2.1_30s_bio_12.tif",
+#            "wc2.1_30s_bio_15.tif")
+# files <- paste0("data/bg_layers/", covar)
 
+extr <- c(
+  xmin = 60,
+  xmax = 180,
+  ymin = -45,
+  ymax = 54
+)
 
+files <- list.files("data/bg_layers/", full.names = TRUE)
+files
 
+rst <- rast(files) %>% 
+  terra::crop(extr) %>% 
+  terra::aggregate(facet = 5)
 
+# principal components of a SpatRaster
+set.seed(4326)
+pca <- values(spatSample(rst, 100000, as.raster=TRUE)) %>% 
+  na.omit() %>% 
+  as.data.frame() %>%
+  prcomp()
+plot(pca)
+
+rast_pca <- predict(rst, pca)
+plot(rast_pca)
+
+# read species occurrence and background samples
+species_data <- st_read("data/species_data.gpkg")
+
+# create the training date for modelling
+model_data <- terra::extract(rast_pca, vect(species_data)) %>% 
+  mutate(occ = species_data$occ,
+         species = as.factor(species_data$species),
+         wt = species_data$wt) %>% 
+  drop_na()
+
+head(model_data)
+nrow(model_data)
+table(model_data$occ)
 
 
 

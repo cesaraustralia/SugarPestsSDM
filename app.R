@@ -13,11 +13,18 @@ library(raster)
 
 # # example raster
 r <- raster::raster("data/toyraster.tif")
-r[r > 50000] <- NA
 
+species_list <- c(
+  "P. saccharicida",
+  "C. infuscatellus",
+  "E. flavipes",
+  "S. excerptalis",
+  "S. grisescens",
+  "Y. flavovittatus"
+)
 
 ## read species data
-sp_all <- sf::st_read("data/species_data.gpkg")
+sp_all <- sf::st_read("data/occ_data.gpkg")
 # set a color palette
 sp_palette <- colorFactor(palette = viridis::inferno(length(unique(sp_all$species))),
                                domain = unique(sp_all$species))
@@ -37,7 +44,7 @@ ui <- shinyUI(
                                 label = "Select prediction map",
                                 options = list(dropdownParent = 'body',
                                                create = 0),
-                                choices = c("P. saccharicida")),
+                                choices = species_list),
                  
                  switchInput(inputId = "split",
                              inline = FALSE,
@@ -100,14 +107,26 @@ server <- function(input, output){
                      label = "Select prediction map",
                      options = list(dropdownParent = 'body',
                                     create = 0),
-                     choices = c("P. saccharicida"))
+                     choices = species_list)
     }
+  })
+  
+  map1 <- reactive({
+    if(!is.null(input$select_map1)){
+      r <- raster::raster(paste0("predictions/", 
+                                 gsub(". ", "_", input$select_map1), 
+                                 ".tif"))
+    }
+    mapview(r,
+            col.regions = terrain.colors(10, rev = TRUE),
+            na.color = NA
+    )
   })
   
   output$maps <- renderUI({
     
     if(input$split){
-      leafsync::sync(mapview(r), mapview(r), no.initial.sync = TRUE)
+      leafsync::sync(map1(), map1(), no.initial.sync = TRUE)
       
     } else{
       renderLeaflet(mapview::mapview(r)$map)
