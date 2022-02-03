@@ -3,7 +3,10 @@
 .RData
 .Ruserdata
 data/*.tif
-data/bg_layers/*
+*.xml
+data/evi
+data/raster_layers/*
+data/raster_scaled
 data/*-shm
 data/*-wal
 data/admin

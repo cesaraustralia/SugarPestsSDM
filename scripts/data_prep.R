@@ -174,38 +174,48 @@ sp_all <- st_read("data/occ_data.gpkg")
 # accessibility map
 access <- terra::rast("data/accessibility_masked.tif")
 plot(access)
-setMinMax(access)
 
 # standardize the map
+setMinMax(access)
 rmin <- terra::minmax(access)[1]
 rmax <- terra::minmax(access)[2]
 rmin; rmax;
 access_std <- (rmax - access) / (rmax - rmin)
 plot(access_std)
 
-# ## calculate the distance map
-# access_agg <- terra::aggregate(x = access_std, facet = 5) %>% 
-#   raster::raster(access_agg)
-# raster::writeRaster(access_agg, "data/admin/bmask.tif")
+# reading the distance map
+distr <- rast("data/occ_distance.tif")
+# distr <- distr^2 # increase the effect of distance
+plot(distr)
+rmin <- terra::minmax(distr)[1]
+rmax <- terra::minmax(distr)[2]
+rmin; rmax;
+dist_std <- (rmax - distr) / (rmax - rmin)
+plot(dist_std)
+
+dist_std <- terra::crop(dist_std, access_std)
+access_std <- terra::crop(access_std, dist_std)
+bias_layer <- (dist_std ^ 4) * access_std
+# terra::writeRaster(bias_layer, "data/bias_layer.tif")
 
 
 ## system can't handle this large raster
 ## sample the raster to reduce time
 tm <- Sys.time()
-bmask <- raster::sampleRegular(raster(access_std), 
+bmask <- raster::sampleRegular(raster::raster(bias_layer), 
                                size = 1e7, 
                                asRaster = TRUE)
 Sys.time() - tm
 plot(bmask)
 
-rmin <- raster::minValue(bmask)
-rmax <- raster::maxValue(bmask)
-rmin; rmax;
-bg_mask_std <- (bmask - rmin) / (rmax - rmin)
-plot(bg_mask_std)
-
-raster::minValue(bg_mask_std)
-raster::maxValue(bg_mask_std)
+# rmin <- raster::minValue(bmask)
+# rmax <- raster::maxValue(bmask)
+# rmin; rmax;
+# bg_mask_std <- (bmask - rmin) / (rmax - rmin)
+# plot(bg_mask_std)
+# 
+# raster::minValue(bg_mask_std)
+# raster::maxValue(bg_mask_std)
 
 # bgmask <- terra::spatSample(access_std, 
 #                             size = 1000000, 
@@ -234,6 +244,7 @@ head(bg_df)
 nrow(bg_df)
 
 # combine background data with species data
+sp_all <- sf::st_read("data/occ_data.gpkg")
 sp_all <- sp_all %>% 
   mutate(occ = 1,
          wt = 1) %>% 
@@ -249,7 +260,7 @@ rename_geometry <- function(g, name){
 
 species_data <- bg_df %>% 
   mutate(occ = 0, 
-         wt = 10000) %>% 
+         wt = 100000) %>% 
   st_as_sf(coords = c("x", "y")) %>%
   rename_geometry(name = "geom") %>% 
   bind_rows(sp_all, .)
@@ -260,21 +271,51 @@ nrow(species_data)
 
 
 # extract data ------------------------------------------------------------
-list.files("data/bg_layers/")
+list.files("data/raster_layers/", full.names = T) %>% 
+  rast() %>% 
+  plot()
 
-covar <- c("wc2.1_30s_bio_4.tif", "wc2.1_30s_bio_5.tif",
-           "wc2.1_30s_bio_6.tif", "wc2.1_30s_bio_12.tif",
+covar <- c("wc2.1_30s_bio_1.tif", 
+           "wc2.1_30s_bio_3.tif", 
+           "wc2.1_30s_bio_5.tif", 
+           "wc2.1_30s_bio_6.tif", 
+           "wc2.1_30s_bio_12.tif",
+           "wc2.1_30s_bio_14.tif",
            "wc2.1_30s_bio_15.tif")
 
-rst <- rast(paste0("data/bg_layers/", covar)) %>% 
-  setNames(c("bio_04", "bio_05", "bio_06", "bio_12", "bio_15"))
+rst <- rast(paste0("data/raster_layers/", covar)) %>% 
+  setNames(c("bio_01", "bio_03", "bio_05", "bio_06", 
+             "bio_12", "bio_14", "bio_15"))
+rst[["bio_12"]] <- log(rst[["bio_12"]] + 1) # add 1 to avoid -Inf in log
+rst[["bio_14"]] <- log(rst[["bio_14"]] + 1) # add 1 to avoid -Inf in log
+rst <- terra::scale(rst)
 plot(rst)
+
+# read EVI layer
+evi <- rast("data/evi/evi_virt.vrt") %>% 
+  terra::resample(rst[[1]]) %>% 
+  terra::scale() %>% 
+  setNames("evi")
+
+rst <- c(rst, evi)
+plot(rst)
+
+for(i in 4:nlyr(rst)){
+  terra::writeRaster(
+    rst[[i]], 
+    paste0("data/raster_scaled/", names(rst)[i], ".tif")
+  )
+  print(names(rst)[i])
+}
+
+species_data <- st_read("data/admin/species_data.gpkg")
 
 # create the training date for modelling
 model_data <- terra::extract(rst, vect(species_data)) %>% 
   mutate(occ = species_data$occ,
          species = as.factor(species_data$species),
          wt = species_data$wt) %>% 
+  # dplyr::select(-ID) %>% 
   drop_na()
 
 head(model_data)
@@ -295,12 +336,12 @@ extr <- c(
   ymax = 54
 )
 
-files <- list.files("data/bg_layers/", full.names = TRUE)
+files <- list.files("data/raster_layers/", full.names = TRUE)
 files
 
 rst <- rast(files) %>% 
   terra::crop(extr) %>% 
-  terra::aggregate(facet = 5)
+  terra::aggregate(fact = 5)
 
 # principal components of a SpatRaster
 set.seed(4326)
@@ -326,6 +367,7 @@ model_data <- terra::extract(rast_pca, vect(species_data)) %>%
 head(model_data)
 nrow(model_data)
 table(model_data$occ)
+table(model_data$species)
 
 
 
