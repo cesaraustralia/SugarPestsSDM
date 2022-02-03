@@ -1,6 +1,6 @@
 library(tidyverse)
-library(mgcv)
 library(terra)
+library(mgcv)
 
 # modelling with covariates -----------------------------------------------
 spname <- "Perkinsiella saccharicida"
@@ -51,16 +51,16 @@ gam.check(modelP)
 
 
 modelPS <- bam(
-  occ ~ s(bio_03, bs = "tp", k = 10, m = 2) +
-    s(bio_03, species, bs = "fs", m = 1) +
-    s(bio_05, bs = "tp", k = 10, m = 2) +
-    s(bio_05, species, bs = "fs", m = 1) +
-    # s(bio_06, bs = "tp", k = 10, m = 2) +
-    # s(bio_06, species, bs = "fs", m = 1) +
-    s(bio_12, bs = "tp", k = 10, m = 2) +
-    s(bio_12, species, bs = "fs", m = 1),
-    # s(bio_15, bs = "tp", k = 10, m = 2) +
-    # s(bio_15, species, bs = "fs", m = 1),
+  occ ~ s(bio_01, bs = "tp", k = 10, m = 2) +
+    s(bio_01, species, bs = "fs", m = 1) +
+    # s(bio_05, bs = "tp", k = 10, m = 2) +
+    # s(bio_05, species, bs = "fs", m = 1) +
+    s(bio_06, bs = "tp", k = 10, m = 2) +
+    s(bio_06, species, bs = "fs", m = 1) +
+    # s(bio_12, bs = "tp", k = 10, m = 2) +
+    # s(bio_12, species, bs = "fs", m = 1) +
+    s(evi, bs = "tp", k = 10, m = 2) +
+    s(evi, species, bs = "fs", m = 1),
   data = model_data,
   method = "fREML",
   family = binomial(link = "cloglog"),
@@ -78,41 +78,23 @@ plot(modelPS, pages = 1, rug = FALSE, shade = TRUE)
 gam.check(modelPS)
 
 
-# data.frame(
-#   mod1 = predict(modelPS, type = "response")[1:6],
-#   mod2 = predict(modelPS, type = "response", exclude = "s(species)")[1:6],
-#   mod3 = predict(modelPS, newdata = head(model_data)[,1:8], type = "response")
-# )
-
 # spatial prediction ------------------------------------------------------
-covar <- c("wc2.1_30s_bio_4.tif", "wc2.1_30s_bio_5.tif",
-           "wc2.1_30s_bio_6.tif", "wc2.1_30s_bio_12.tif",
-           "wc2.1_30s_bio_15.tif")
-
-extr <- c(
-  xmin = 60,
-  xmax = 180,
-  ymin = -45,
-  ymax = 54
-)
-
-rst <- rast(paste0("data/bg_layers/", covar)) %>% 
-  setNames(c("bio_04", "bio_05", "bio_06", "bio_12", "bio_15")) %>% 
+# read raster data
+rst <- rast(list.files("data/raster_scaled/", full.names = TRUE))
+nrst <- rst %>% 
   terra::crop(extr) %>% 
   terra::aggregate(fact = 5)
 
-plot(rst)
-
 # make species raster
-spname <- "Perkinsiella saccharicida"
-r <- rst[[1]]
+as.character(unique(model_data$species))
+spname <- "Yamatotettix flavovittatus"
+r <- nrst[[1]]
 r[] <- spname
-spr <- mask(r, rst[[1]])
-names(spr) <- "species"
-plot(spr)
-
-rast_pred <- c(rst, spr)
+r <- mask(r, nrst[[1]])
+names(r) <- "species"
+rast_pred <- c(nrst, r)
 plot(rast_pred)
+
 
 facts <- list(species = levels(as.factor(model_data$species)))
 prediction <- terra::predict(object = rast_pred,
@@ -120,13 +102,38 @@ prediction <- terra::predict(object = rast_pred,
                              # type = "response",
                              factors = facts)
 plot(prediction)
-plot(exp(prediction))
+plot(exp(prediction) * 25000)
 plot(terra::app(prediction, fun = plogis))
 
-plot(st_geometry(sp_all[sp_all$species == spname, ]), add = TRUE)
+# plot species points
+species_data %>% 
+  filter(occ == 1, species == spname) %>% 
+  st_geometry() %>% 
+  plot(add = TRUE)
 
 
 
+library(mapview)
+# plot in mapview
+newpred <- raster::raster(exp(prediction) * 25000)
+mapview::mapview(newpred, 
+                 col.regions = terrain.colors(10, rev = TRUE),
+                 na.color = NA)
+
+spfname <- paste(
+  str_sub(spname, 1, 1),
+  str_split(spname, " ", simplify = TRUE)[2],
+  sep = "_"
+)
+spfname
+raster::writeRaster(
+  x = newpred,
+  filename = sprintf("predictions/%s.tif", spfname),
+  overwrite = TRUE
+)
+
+
+# 
 # -------------------------------------------------------------------------
 # modelling with pca ------------------------------------------------------
 spname <- "Perkinsiella saccharicida"
@@ -252,6 +259,7 @@ mapview::mapview(newpred,
 
 # -------------------------------------------------------------------------
 # linear mixed models -----------------------------------------------------
+library(tidyverse)
 library(terra)
 
 extr <- c(
@@ -261,6 +269,7 @@ extr <- c(
   ymax = 54
 )
 
+rst <- rast(list.files("data/raster_scaled/", full.names = TRUE))
 nrst <- rst %>% 
   terra::crop(extr) %>% 
   terra::aggregate(fact = 5)

@@ -308,19 +308,34 @@ for(i in 4:nlyr(rst)){
   print(names(rst)[i])
 }
 
-species_data <- st_read("data/admin/species_data.gpkg")
+
+
+
+extr <- c(
+  xmin = 60,
+  xmax = 180,
+  ymin = -45,
+  ymax = 54
+)
+
+species_data <- st_read("data/admin/species_data.gpkg") %>% 
+  st_crop(extr) ##*** crop east ***##
+rst <- rast(list.files("data/raster_scaled/", full.names = TRUE))
 
 # create the training date for modelling
-model_data <- terra::extract(rst, vect(species_data)) %>% 
+model_data <-  terra::extract(rst, vect(species_data)) %>% 
   mutate(occ = species_data$occ,
          species = as.factor(species_data$species),
          wt = species_data$wt) %>% 
-  # dplyr::select(-ID) %>% 
+  dplyr::select(-ID) %>%
   drop_na()
 
 head(model_data)
-nrow(model_data)
 table(model_data$occ)
+table(model_data$species)
+
+nrow(model_data)
+nrow(species_data)
 
 
 # pca ---------------------------------------------------------------------

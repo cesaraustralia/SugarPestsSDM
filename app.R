@@ -1,7 +1,7 @@
 # remotes::install_github("Appsilon/shiny.react")
 # remotes::install_github("Appsilon/shiny.fluent")
-library(tidyverse)
 # library(shiny.fluent)
+library(tidyverse)
 library(shiny)
 library(shinythemes)
 library(shinyWidgets)
