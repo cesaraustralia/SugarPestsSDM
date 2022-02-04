@@ -11,6 +11,8 @@ library(mapview)
 library(raster)
 # library(terra)
 
+source("Rsource/SwitchButton.R")
+
 # species list
 species_list <- c(
   "P. saccharicida",
@@ -42,7 +44,7 @@ myRenderMapview <- function(expr, env = parent.frame(), quoted = FALSE){
 ui <- shinyUI(
   navbarPage("Sugar Biosecurity",
              selected = "Prediction maps", 
-             theme = shinytheme("journal"),
+             theme = "button.css",
 
              # Panel 1 -----------------------------------------------------------------
              tabPanel(
@@ -51,15 +53,18 @@ ui <- shinyUI(
                splitLayout(
 
                  selectizeInput(inputId = "select_map1", 
-                                label = "Select prediction map",
+                                label = "Select species map",
                                 options = list(dropdownParent = 'body',
                                                create = 0),
                                 choices = species_list),
                  
-                 switchInput(inputId = "split",
-                             inline = FALSE,
-                             value = FALSE),
-
+                 # imported function
+                 switchButton(inputId = "split",
+                              label = "Split view",
+                              value = FALSE,
+                              col = "GB",
+                              type = "TF"),
+               
                  
                  uiOutput("select2")
                  
@@ -72,14 +77,20 @@ ui <- shinyUI(
 
              # Panel 2 -----------------------------------------------------------------
              tabPanel(
-               "Species maps",
+               "Occurrence maps",
                
                leafletOutput("map", height = 600)
                
              ),
              
 
+
              # Panel 3 -----------------------------------------------------------------
+             tabPanel("Seasonal abundance",
+              HTML("This will be provided latter!")        
+             ),
+             
+             # Panel 4 -----------------------------------------------------------------
              tabPanel("Info",
                htmlOutput("info")
                
@@ -93,7 +104,8 @@ server <- function(input, output){
   
   output$map <- renderLeaflet({
     leaflet() %>% 
-      addTiles() %>% 
+      addTiles() %>%
+      addProviderTiles(providers$CartoDB.Positron) %>% 
       addCircleMarkers(
         data = sp_all,
         radius = 6,
@@ -114,7 +126,7 @@ server <- function(input, output){
   output$select2 <- renderUI({
     if(input$split){
       selectizeInput(inputId = "select_map2", 
-                     label = "Select prediction map",
+                     label = "Select species map",
                      options = list(dropdownParent = 'body',
                                     create = 0),
                      choices = species_list)
@@ -126,11 +138,11 @@ server <- function(input, output){
       occurrence <- raster::raster(paste0("predictions/", 
                                  gsub(". ", "_", input$select_map1), 
                                  ".tif"))
+      mapview(occurrence,
+              col.regions = terrain.colors(10, rev = TRUE),
+              na.color = NA
+      )
     }
-    mapview(occurrence,
-            col.regions = terrain.colors(10, rev = TRUE),
-            na.color = NA
-    )
   })
   
   map2 <- reactive({
@@ -138,11 +150,11 @@ server <- function(input, output){
       occurrence <- raster::raster(paste0("predictions/", 
                                  gsub(". ", "_", input$select_map2), 
                                  ".tif"))
+      mapview(occurrence,
+              col.regions = terrain.colors(10, rev = TRUE),
+              na.color = NA
+      )
     }
-    mapview(occurrence,
-            col.regions = terrain.colors(10, rev = TRUE),
-            na.color = NA
-    )
   })
   
   output$maps <- renderUI({
