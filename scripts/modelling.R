@@ -57,14 +57,14 @@ modelPS <- bam(
     # s(bio_05, species, bs = "fs", m = 1) +
     s(bio_06, bs = "tp", k = 10, m = 2) +
     s(bio_06, species, bs = "fs", m = 1) +
-    # s(bio_12, bs = "tp", k = 10, m = 2) +
-    # s(bio_12, species, bs = "fs", m = 1) +
-    s(evi, bs = "tp", k = 10, m = 2) +
-    s(evi, species, bs = "fs", m = 1),
+    s(bio_12, bs = "tp", k = 10, m = 2) +
+    s(bio_12, species, bs = "fs", m = 1),
+    # s(evi, bs = "tp", k = 10, m = 2) +
+    # s(evi, species, bs = "fs", m = 1),
   data = model_data,
   method = "fREML",
   family = binomial(link = "cloglog"),
-  weights = model_data$wt,
+  weights = ifelse(model_data$wt == 1, 1, 1e6),
   # select = TRUE,
   discrete = TRUE,
   control = gam.control(trace = FALSE), 
@@ -87,7 +87,7 @@ nrst <- rst %>%
 
 # make species raster
 as.character(unique(model_data$species))
-spname <- "Yamatotettix flavovittatus"
+spname <- "Perkinsiella saccharicida"
 r <- nrst[[1]]
 r[] <- spname
 r <- mask(r, nrst[[1]])
@@ -102,7 +102,7 @@ prediction <- terra::predict(object = rast_pred,
                              # type = "response",
                              factors = facts)
 plot(prediction)
-plot(exp(prediction) * 25000)
+plot(exp(prediction) * 25000000)
 plot(terra::app(prediction, fun = plogis))
 
 # plot species points
@@ -116,7 +116,7 @@ species_data %>%
 library(mapview)
 # plot in mapview
 newpred <- raster::raster(exp(prediction) * 25000)
-mapview::mapview(newpred, 
+a <- mapview::mapview(newpred, 
                  col.regions = terrain.colors(10, rev = TRUE),
                  na.color = NA)
 

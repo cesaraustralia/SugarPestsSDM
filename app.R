@@ -11,9 +11,7 @@ library(mapview)
 library(raster)
 # library(terra)
 
-# # example raster
-r <- raster::raster("data/toyraster.tif")
-
+# species list
 species_list <- c(
   "P. saccharicida",
   "C. infuscatellus",
@@ -26,8 +24,20 @@ species_list <- c(
 ## read species data
 sp_all <- sf::st_read("data/occ_data.gpkg")
 # set a color palette
-sp_palette <- colorFactor(palette = viridis::inferno(length(unique(sp_all$species))),
-                               domain = unique(sp_all$species))
+sp_palette <- colorFactor(
+  palette = viridis::inferno(length(unique(sp_all$species))),
+  domain = unique(sp_all$species)
+)
+
+# render mapview doesn't work; this function works
+myRenderMapview <- function(expr, env = parent.frame(), quoted = FALSE){
+  if (!quoted) 
+    expr = substitute(mapview:::mapview2leaflet(expr))
+  htmlwidgets::shinyRenderWidget(expr, leafletOutput, env, 
+                                 quoted = TRUE)
+}
+
+
 
 ui <- shinyUI(
   navbarPage("Sugar Biosecurity",
@@ -113,11 +123,23 @@ server <- function(input, output){
   
   map1 <- reactive({
     if(!is.null(input$select_map1)){
-      r <- raster::raster(paste0("predictions/", 
+      occurrence <- raster::raster(paste0("predictions/", 
                                  gsub(". ", "_", input$select_map1), 
                                  ".tif"))
     }
-    mapview(r,
+    mapview(occurrence,
+            col.regions = terrain.colors(10, rev = TRUE),
+            na.color = NA
+    )
+  })
+  
+  map2 <- reactive({
+    if(!is.null(input$select_map2)){
+      occurrence <- raster::raster(paste0("predictions/", 
+                                 gsub(". ", "_", input$select_map2), 
+                                 ".tif"))
+    }
+    mapview(occurrence,
             col.regions = terrain.colors(10, rev = TRUE),
             na.color = NA
     )
@@ -126,14 +148,16 @@ server <- function(input, output){
   output$maps <- renderUI({
     
     if(input$split){
-      leafsync::sync(map1(), map1(), no.initial.sync = TRUE)
+      leafsync::sync(map1(), map2(), no.initial.sync = TRUE)
       
     } else{
-      renderLeaflet(mapview::mapview(r)$map)
+      myRenderMapview(map1())
     }
     
   })
   
+  
+    
   # render HTML page
   getPage <- function(){
     return(includeHTML("modelling_info.html"))
