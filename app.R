@@ -4,7 +4,8 @@
 library(tidyverse)
 library(shiny)
 library(shinythemes)
-library(shinyWidgets)
+# library(shinyWidgets)
+library(shinycssloaders)
 library(leaflet)
 library(leafsync)
 library(mapview)
@@ -38,7 +39,7 @@ myRenderMapview <- function(expr, env = parent.frame(), quoted = FALSE){
   htmlwidgets::shinyRenderWidget(expr, leafletOutput, env, 
                                  quoted = TRUE)
 }
-
+n <- 0
 
 
 ui <- shinyUI(
@@ -70,8 +71,9 @@ ui <- shinyUI(
                  
                ),
                
-               # map prediction map
-               uiOutput("maps")
+               # map prediction maps
+               uiOutput("maps") %>%
+                 withSpinner(color = "#428bca")# "#0dc5c1"
                       
              ),
 
@@ -87,12 +89,12 @@ ui <- shinyUI(
 
              # Panel 3 -----------------------------------------------------------------
              tabPanel("Seasonal abundance",
-              HTML("This will be provided latter!")        
+              HTML("This page will be added latter!")        
              ),
              
              # Panel 4 -----------------------------------------------------------------
              tabPanel("Info",
-               htmlOutput("info")
+                      uiOutput("info")
                
              )
              
@@ -140,7 +142,7 @@ server <- function(input, output){
                                  ".tif"))
       mapview(occurrence,
               col.regions = terrain.colors(10, rev = TRUE),
-              na.color = NA
+              na.color = NA, height = 600
       )
     }
   })
@@ -148,18 +150,27 @@ server <- function(input, output){
   map2 <- reactive({
     if(!is.null(input$select_map2)){
       occurrence <- raster::raster(paste0("predictions/", 
-                                 gsub(". ", "_", input$select_map2), 
-                                 ".tif"))
+                                          gsub(". ", "_", input$select_map2), 
+                                          ".tif"))
       mapview(occurrence,
               col.regions = terrain.colors(10, rev = TRUE),
-              na.color = NA
+              na.color = NA, height = 600
       )
     }
   })
   
+
+  # the maps
   output$maps <- renderUI({
     
     if(input$split){
+      
+      n <- n + 1
+      if(n > 1) browser()
+      
+      
+      # req(map2())
+      
       leafsync::sync(map1(), map2(), no.initial.sync = TRUE)
       
     } else{
@@ -171,12 +182,11 @@ server <- function(input, output){
   
     
   # render HTML page
-  getPage <- function(){
-    return(includeHTML("modelling_info.html"))
-  }
-  output$info <- renderUI({ getPage() })
+  # getPage <- function(){
+  #   return(includeHTML("modelling_info.html"))
+  # }
+  output$info <- renderUI({ includeMarkdown("modelling_info.md") })
   
 }
 
 shinyApp(ui, server)
-

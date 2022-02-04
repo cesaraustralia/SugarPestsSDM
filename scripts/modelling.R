@@ -87,6 +87,7 @@ nrst <- rst %>%
 
 # make species raster
 as.character(unique(model_data$species))
+
 spname <- "Perkinsiella saccharicida"
 r <- nrst[[1]]
 r[] <- spname
