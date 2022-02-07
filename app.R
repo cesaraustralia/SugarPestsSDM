@@ -12,6 +12,7 @@ library(mapview)
 library(raster)
 # library(terra)
 
+# load the switch code
 source("Rsource/SwitchButton.R")
 
 # species list

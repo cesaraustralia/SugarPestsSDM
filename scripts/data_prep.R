@@ -18,6 +18,9 @@ species <- c(
   "Perkinsiella thompsoni"
 )
 
+gbif_data <- geodata::sp_occurrence(genus = "Perkinsiella",
+                                    species = "*")
+
 get_species <- function(x, genus = FALSE){
   out <- x %>%
     str_split(" ") %>%
