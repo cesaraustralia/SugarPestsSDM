@@ -15,6 +15,10 @@ library(raster)
 # load the switch code
 source("Rsource/SwitchButton.R")
 
+# this will be deleted later
+posterior_pred <- read.csv("data/posterior_pred.csv")
+stan_data <- read.csv("data/stan_data.csv")
+
 # species list
 species_list <- c(
   "P. saccharicida",
@@ -40,7 +44,6 @@ myRenderMapview <- function(expr, env = parent.frame(), quoted = FALSE){
   htmlwidgets::shinyRenderWidget(expr, leafletOutput, env, 
                                  quoted = TRUE)
 }
-n <- 0
 
 
 ui <- shinyUI(
@@ -89,8 +92,14 @@ ui <- shinyUI(
 
 
              # Panel 3 -----------------------------------------------------------------
-             tabPanel("Seasonal abundance",
-              HTML("This page will be added latter!")        
+             tabPanel(
+               "Seasonal abundance",
+               selectizeInput(inputId = "select_sp", 
+                              label = "Select species",
+                              options = list(dropdownParent = 'body',
+                                             create = 0),
+                              choices = c("P. saccharicida")),
+               plotOutput("ggplt")       
              ),
              
              # Panel 4 -----------------------------------------------------------------
@@ -166,11 +175,7 @@ server <- function(input, output){
     
     if(input$split){
       
-      n <- n + 1
-      if(n > 1) browser()
-      
-      
-      # req(map2())
+      req(map2())
       
       leafsync::sync(map1(), map2(), no.initial.sync = TRUE)
       
@@ -181,6 +186,18 @@ server <- function(input, output){
   })
   
   
+  # seasonal abundance
+  output$ggplt <- renderPlot({
+    ggplot(data = posterior_pred, 
+           aes(x = ym, y = med, group = 1)) +
+      geom_point() +
+      geom_path() +
+      geom_ribbon(aes(ymin = med - 2*sd, ymax = med + 2*sd), alpha = 0.1) +
+      geom_point(data = stan_data, aes(x =ym, y = num), color = "red") +
+      theme_bw() +
+      theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
+      labs(x = "Time", y = "Total observed Perkinsiella")
+  })
     
   # render HTML page
   # getPage <- function(){
