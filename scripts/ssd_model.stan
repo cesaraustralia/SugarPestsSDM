@@ -7,13 +7,14 @@ data {
   // Times of the observations
   int<lower=0> T; // number of time periods to predict to
   int t[N]; // Time periods of the observations
+  
+  int<lower=0> ids[N];
 }
 
 // The parameters accepted by the model. Our model
 // accepts two parameters 'mu' and 'sigma'.
 parameters {
-  // int<lower=0> N;
-  vector[T] s;
+  vector[T] s; // latent time series; the process model
 
   real<lower=0> sigma_s; // variance for hyperprior on initial s
   real<lower=0> sigma_t_s; // the time dependence
@@ -25,10 +26,12 @@ parameters {
 transformed parameters {
   vector[N] mu;
 
-  for (i in 1:N){
-    // linear model for poisson link
-    mu[i] = exp(s[i]);
-  }
+  // for (i in 1:N){
+  //   // the exponentail of the hidden process for poisson
+  //   mu[i] = exp(s[i]);
+  // }
+  
+  mu = exp(s[ids]);
 
 }
 
@@ -49,7 +52,7 @@ model {
 
   // data model - the number of pest, independent of process model
   // Note: We've now included the t index to link the observations to the correct time periods
-  y ~ poisson(mu[t]);
+  y ~ poisson(mu[t]); // t can be remove compeletely
 }
 
 // make predictions
