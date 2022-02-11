@@ -99,7 +99,6 @@ add_months <- function(date_list, n = 3){
   return(c(date_list, maxdate[-1]))
 }
 
-
 # Stan model --------------------------------------------------------------
 options(mc.cores = 8)
 rstan_options(auto_write = TRUE)
@@ -132,7 +131,11 @@ model_data <- list(
   y = agg_data$num,
   T = nrow(stan_data) + increment, 
   t = 1:nrow(agg_data),
-  ids = which(!is.na(stan_data$num))
+  ids = which(!is.na(stan_data$num)),
+  month = stan_data$ym %>% 
+    add_months(increment) %>% 
+    ym() %>% 
+    month()
 )
 model_data
 
@@ -145,7 +148,7 @@ mod <- stan_model(file = "ssd_model.stan")
 mod_fit <- sampling(
   object = mod, 
   data = model_data,
-  chains = 2,
+  chains = 4,
   warmup = 1000,
   iter = 3000,
   cores = 8,
@@ -166,6 +169,7 @@ traceplot(mod_fit)
 
 # prediction
 ext_fit <- extract(mod_fit)
+apply(ext_fit$prediction, 2, median)
 
 posterior_pred <- data.frame(
   med = apply(ext_fit$prediction, 2, median),
@@ -190,4 +194,5 @@ ggplot(data = posterior_pred,
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
   labs(x = "Time", y = "Total observed Perkinsiella")
+
 
