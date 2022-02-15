@@ -121,10 +121,11 @@ mod <- stan_model(file = "ssd_model.stan")
 mod_fit <- sampling(
   object = mod, 
   data = model_data,
-  chains = 4,
+  chains = 1,
   warmup = 2000,
   iter = 6000,
   cores = 8,
+  open_progress = FALSE,
   verbose = TRUE
 )
 
@@ -137,8 +138,8 @@ apply(extract(mod_fit)$prediction, 2, median)
 # plot(mod_fit)
 
 color_scheme_set("red")
-mcmc_intervals(mod_fit, pars = c("sigma_s0", "sigma_s", "b1_month", "b2_month"))
-traceplot(mod_fit, pars =  c("sigma_s0", "sigma_s", "b1_month", "b2_month"))
+mcmc_intervals(mod_fit, pars = c("sigma_s0", "sigma_s", "b1_month"))#, "b2_month"))
+traceplot(mod_fit, pars =  c("sigma_s0", "sigma_s", "b1_month"))#, "b2_month"))
 # traceplot(mod_fit)
 
 
@@ -155,18 +156,29 @@ posterior_pred <- data.frame(
     ym = add_months(stan_data$ym, n = increment)
   )
 
+# add day and convert ym to date for time intervals in x.axis
+posterior_pred <- posterior_pred %>% 
+  mutate(ymd = as.Date(paste0(ym, "-01")))
+stan_data <- stan_data %>% 
+  mutate(ymd = as.Date(paste0(ym, "-01")))
+
+
 
 # plot the prediction
-ggplot(data = posterior_pred, 
-       aes(x = ym, y = med, group = 1)) +
-  geom_point(size = 1, alpha = 0.7) +
-  geom_path() +
-  geom_ribbon(aes(ymin = med - 2*sd, ymax = med + 2*sd), alpha = 0.1) +
+ggplot(data = posterior_pred, aes(x = ymd)) +
+  geom_point(aes(x = ymd, y = med, group = 1, color = "Predicted"),
+             size = 1.5, shape = 16, data = posterior_pred) +
+  geom_path(aes(x = ymd, y = med, group = 1), alpha = 0.8, data = posterior_pred) +
+  # geom_ribbon(aes(ymin = med - 2 * sd, ymax = med + 2 * sd, group = 1),
+  #             alpha = 0.2,
+  #             data = posterior_pred) +
   # ylim(0, 500) +
-  geom_point(data = stan_data, aes(x =ym, y = num), 
-             color = "red", shape = 5, size = 2) +
+  geom_point(aes(x = ymd, y = num, color = "Observed"),
+             shape = 5, size = 2, data = stan_data) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
-  labs(x = "Time", y = "Total observed Perkinsiella")
+  scale_x_date(date_breaks = "3 months",
+               date_labels = "%b %Y") +
+  labs(x = "Date", y = "Total observed Perkinsiella", color = "")
 
 

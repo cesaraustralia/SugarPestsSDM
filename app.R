@@ -16,8 +16,10 @@ library(raster)
 source("Rsource/SwitchButton.R")
 
 # this will be deleted later
-posterior_pred <- read.csv("data/posterior_pred.csv")
-stan_data <- read.csv("data/stan_data.csv")
+posterior_pred <- read.csv("data/posterior_pred.csv") %>% 
+  mutate(ymd = as.Date(ymd))
+stan_data <- read.csv("data/stan_data.csv") %>% 
+  mutate(ymd = as.Date(ymd))
 
 # species list
 species_list <- c(
@@ -94,11 +96,23 @@ ui <- shinyUI(
              # Panel 3 -----------------------------------------------------------------
              tabPanel(
                "Seasonal abundance",
+               
+               splitLayout(
                selectizeInput(inputId = "select_sp", 
                               label = "Select species",
                               options = list(dropdownParent = 'body',
                                              create = 0),
                               choices = c("P. saccharicida")),
+               
+               # imported function
+               switchButton(inputId = "showunc",
+                            label = "Show uncertainty",
+                            value = FALSE,
+                            col = "GB",
+                            type = "TF"),
+               
+               ),
+               
                plotOutput("ggplt")       
              ),
              
@@ -188,15 +202,35 @@ server <- function(input, output){
   
   # seasonal abundance
   output$ggplt <- renderPlot({
-    ggplot(data = posterior_pred, 
-           aes(x = ym, y = med, group = 1)) +
-      geom_point() +
-      geom_path() +
-      geom_ribbon(aes(ymin = med - 2*sd, ymax = med + 2*sd), alpha = 0.1) +
-      geom_point(data = stan_data, aes(x =ym, y = num), color = "red") +
-      theme_bw() +
+    # ggplot(data = posterior_pred, 
+    #        aes(x = ym, y = med, group = 1)) +
+    #   geom_point() +
+    #   geom_path() +
+    #   geom_ribbon(aes(ymin = med - 2*sd, ymax = med + 2*sd), alpha = 0.1) +
+    #   geom_point(data = stan_data, aes(x =ym, y = num), color = "red") +
+    #   theme_bw() +
+    #   theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
+    #   labs(x = "Time", y = "Total observed Perkinsiella")
+    g <- ggplot(data = posterior_pred, aes(x = ymd)) +
+      geom_point(aes(x = ymd, y = med, group = 1, color = "Predicted"),
+                 size = 2, shape = 16, data = posterior_pred) +
+      geom_path(aes(x = ymd, y = med, group = 1), alpha = 0.8, data = posterior_pred) +
+      geom_point(aes(x = ymd, y = num, color = "Observed"),
+                 shape = 5, size = 3, data = stan_data) +
+      theme_minimal() +
       theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
-      labs(x = "Time", y = "Total observed Perkinsiella")
+      scale_x_date(date_breaks = "3 months",
+                   date_labels = "%b %Y") +
+      labs(x = "Date", y = "Total observed Perkinsiella", color = "")
+    
+    if(input$showunc){
+      g <- g +
+        geom_ribbon(aes(ymin = med - 2 * sd, ymax = med + 2 * sd, group = 1),
+                    alpha = 0.2,
+                    data = posterior_pred)
+    }
+    
+    plot(g)
   })
     
   # render HTML page
