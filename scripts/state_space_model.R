@@ -3,14 +3,15 @@ library(lubridate)
 library(rstan)
 library(bayesplot)
 
-#
-# data visualisation ------------------------------------------------------
+source("R/transformations_fun.R")
+
 # read the data
 dt <- read_csv("data/Perkensiella.csv") %>% 
   mutate(Date = lubridate::dmy(Date))
 head(dt)
 
-
+#
+# data visualisation ------------------------------------------------------
 # plot sum of abundance by date
 dt %>% 
   group_by(Site, Date) %>% 
@@ -68,37 +69,6 @@ dt %>%
 
 
 
-# date functions ----------------------------------------------------------
-# generate dates, including the gaps
-seq_date <- function(date){
-  mindate <- min(date) %>% 
-    as.Date() %>% 
-    format("%Y-%m") %>% 
-    paste0("-01") %>% 
-    as.Date()
-  maxdate <- max(date) %>% 
-    as.Date() %>% 
-    format("%Y-%m") %>% 
-    paste0("-01") %>% 
-    as.Date()
-  out <- seq.Date(mindate, maxdate, by = "month") %>% 
-    as.Date() %>% 
-    format("%Y-%m") %>% 
-    data.frame(ym = .)
-  return(out)
-}
-# add n months to a vector of dates
-add_months <- function(date_list, n = 3){
-  lastdate <- date_list %>% 
-    paste0("-01") %>% 
-    max() %>% 
-    as.Date()
-  maxdate <- seq.Date(lastdate, by = "month", length.out = n + 1) %>% 
-    # as.Date() %>% 
-    format("%Y-%m")
-  return(c(date_list, maxdate[-1]))
-}
-
 # Stan model --------------------------------------------------------------
 options(mc.cores = 8)
 rstan_options(auto_write = TRUE)
@@ -123,6 +93,7 @@ stan_data <- seq_date(dt$Date) %>%
 stan_data
 
 
+
 # the number of month to forecast to
 increment <- 3
 # data for the Stan model
@@ -132,16 +103,18 @@ model_data <- list(
   T = nrow(stan_data) + increment, 
   t = 1:nrow(agg_data),
   ids = which(!is.na(stan_data$num)),
-  month = stan_data$ym %>% 
-    add_months(increment) %>% 
-    ym() %>% 
+  month = stan_data$ym %>%
+    add_months(increment) %>%
+    ym() %>%
     month()
+  # month_sin = circular_month(stan_data$ym, increment, sin = TRUE),
+  # month_cos = circular_month(stan_data$ym, increment, sin = FALSE)
 )
 model_data
 
 
 # read the stan file
-rm(mod)
+if(exists("mod")) rm(mod, mod_fit); gc();
 mod <- stan_model(file = "ssd_model.stan")
 
 # sample the parameters
@@ -149,27 +122,28 @@ mod_fit <- sampling(
   object = mod, 
   data = model_data,
   chains = 4,
-  warmup = 1000,
-  iter = 3000,
+  warmup = 2000,
+  iter = 6000,
   cores = 8,
   verbose = TRUE
 )
 
-sm <- summary(mod_fit)
-sm$summary |> head()
+# check the prediction and samples
+apply(extract(mod_fit)$prediction, 2, median)
 
 
-plot(mod_fit)
+# sm <- summary(mod_fit)
+# sm$summary |> head()
+# plot(mod_fit)
 
 color_scheme_set("red")
-mcmc_intervals(mod_fit, pars = c("mu[1]", "sigma_s", "sigma_t_s"))
-traceplot(mod_fit, pars = c("mu[1]", "sigma_s", "sigma_t_s"))
-traceplot(mod_fit)
+mcmc_intervals(mod_fit, pars = c("sigma_s0", "sigma_s", "b1_month", "b2_month"))
+traceplot(mod_fit, pars =  c("sigma_s0", "sigma_s", "b1_month", "b2_month"))
+# traceplot(mod_fit)
 
 
 # prediction
 ext_fit <- extract(mod_fit)
-apply(ext_fit$prediction, 2, median)
 
 posterior_pred <- data.frame(
   med = apply(ext_fit$prediction, 2, median),

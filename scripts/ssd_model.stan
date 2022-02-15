@@ -1,4 +1,4 @@
-// The input data is a vector 'y' of length 'N'.
+// defining he input data
 data {
   // training data
   int<lower=0> N; // number of observed insects
@@ -15,59 +15,65 @@ data {
   int<lower=0> ids[N];
 }
 
-// The parameters accepted by the model. Our model
-// accepts two parameters 'mu' and 'sigma'.
+
+// the parameters accepted by the model
 parameters {
-  /// **** change this to int<lowewr=0> s[T]; to avoid negatives? ****
   vector[T] s; // latent time series; the process model
 
   real<lower=0> sigma_s0; // variance for hyperprior on initial s
   real<lower=0> sigma_s; // the time dependence
-
-  real beta0; // intercept for the process model
-  real b_month; // slope of month
-}
-
-
-transformed parameters {
-  vector[N] mu;
-
-  // for (i in 1:N){
-  //   mu[i] = exp(s[i]);
-  // }
   
-  // the exponentail of the hidden process for poisson
-  mu = exp(s[ids]);
-
+  real<lower=0> phi; // neg. binomial dispersion parameter
+  
+  real beta0; // intercept for the process model
+  real b1_month; // slope of month
+  real b2_month; // slope of month
 }
+
+
+// calculate vatiables that do not rely on model parameters
+transformed parameters {
+  // transfer month to sine and cosine as circular variable
+  vector[T] month_cos;
+  vector[T] month_sin;
+  
+  month_cos = cos(2 * 3.141593 * (month / 12));
+  month_sin = sin(2 * 3.141593 * (month / 12));
+}
+
 
 // The model to be estimated.
 model {
   // priors
+  phi ~ cauchy(0., 3);
   sigma_s0 ~ normal(0, 10);
   sigma_s ~ normal(0, 10);
   beta0 ~ normal(0, 10);
-  b_month ~ normal(0, 3);
+  b1_month ~ normal(0, 5);
+  b2_month ~ normal(0, 5);
 
-  // initial priors
+  // initial state
   s[1] ~ normal(0, sigma_s0);
 
-  // process model - state at time
+  // process model - state at each time
   for (i in 2:T){
-    s[i] ~ normal(s[i-1] + beta0 + b_month * month[i], sigma_s);
+    s[i] ~ normal(s[i-1] + beta0 + b1_month * month_sin[i] + b2_month * month_cos[i], sigma_s);
   }
 
   // data model - the number of pest, independent of process model
-  // Note: We've now included the t index to link the observations to the correct time periods
-  y ~ poisson(mu[t]); // [t] can be remove compeletely
+  // y ~ poisson_log(s[ids]); 
+  y ~ neg_binomial_2_log(s[ids], phi);
 }
 
 // make predictions
 generated quantities {
-  // So we'll predict all periods:
-  vector[T] prediction;
-
+  // predict to all periods:
+  int<lower=0> prediction[T];
+  vector[T] mu;
+  
+  mu = exp(s);
+  
   for (i in 1:T){
-    prediction[i] = poisson_rng(exp(s[i]));
+    prediction[i] = neg_binomial_2_rng(mu[i], phi);
   }
 }
