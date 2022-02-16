@@ -225,7 +225,9 @@ server <- function(input, output){
     
     if(input$showunc){
       g <- g +
-        geom_ribbon(aes(ymin = med - 2 * sd, ymax = med + 2 * sd, group = 1),
+        geom_ribbon(aes(ymin = ifelse(med - 2 * sd < 0, 0, med - 2 * sd),
+                        ymax = med + 2 * sd, 
+                        group = 1),
                     alpha = 0.2,
                     data = posterior_pred)
     }
