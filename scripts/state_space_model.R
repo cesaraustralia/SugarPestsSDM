@@ -115,7 +115,7 @@ model_data
 
 # read the stan file
 if(exists("mod")) rm(mod, mod_fit); gc();
-mod <- stan_model(file = "ssd_model.stan")
+mod <- stan_model(file = "ssm_model.stan")
 
 # sample the parameters
 mod_fit <- sampling(

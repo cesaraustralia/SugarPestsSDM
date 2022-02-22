@@ -116,6 +116,12 @@ ui <- shinyUI(
                plotOutput("ggplt")       
              ),
              
+             
+             tabPanel(
+               "Pathwasy",
+               HTML("This will be filled.")
+             ),
+             
              # Panel 4 -----------------------------------------------------------------
              tabPanel("Info",
                       uiOutput("info")
