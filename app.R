@@ -118,7 +118,7 @@ ui <- shinyUI(
              
              
              tabPanel(
-               "Pathwasy",
+               "Pathways",
                HTML("This will be filled.")
              ),
              

@@ -13,4 +13,4 @@ data/admin
 data/admin/*
 data/*-journal
 Rplots.pdf
-
+venv/
