@@ -83,7 +83,7 @@ bg_mask <- st_read("data/background_mask.gpkg")
 # R couldn't mask the layer! QGIS did the job!
 tgb <- st_read("data/tgbs.gpkg")
 head(tgb)
-nrow(tbg)
+nrow(tgb)
 plot(st_geometry(tgb))
 
 leaflet(bg_mask) %>%

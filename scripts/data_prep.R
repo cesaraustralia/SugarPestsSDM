@@ -35,25 +35,25 @@ get_species <- function(x, genus = FALSE){
 
 splist <- list()
 for(i in seq_along(species)){
-
+  
   gbif_data <- geodata::sp_occurrence(genus = get_species(species[i], TRUE),
                                       species = get_species(species[i], FALSE))
-
+  
   # take a look at the downloaded data:
   # gbif_data %>% View()
-
+  
   if(is.null(gbif_data)) next
-
+  
   sp_coords <- gbif_data %>%
     dplyr::select(lon, lat, status = occurrenceStatus,
                   country, species, genus, family) %>%
     drop_na(lon, lat)
-
+  
   if(nrow(sp_coords) < 2) next
-
+  
   sp_points <- st_as_sf(sp_coords, coords = c("lon", "lat"))
   # sp_points
-
+  
   splist[[i]] <- sp_points
 }
 
@@ -97,18 +97,16 @@ plot(bias_layer)
 bioclim <- geodata::worldclim_global(var = "bio",
                                      res = 0.5,
                                      path = "data/bioclim.tif")
-plot(bioclim)
-
 
 plot(bioclim[[1]])
-plot(sp_points$geometry, add = TRUE)
+plot(sp_all$geometry, add = TRUE)
 
 leaflet() %>%
   addTiles() %>%
-  addRasterImage(raster::raster(clim[[1]])) %>%
-  addMarkers(data = sp_points)
+  addRasterImage(raster::raster(bioclim[[1]])) %>%
+  addMarkers(data = sp_all)
 
-r <- clim[[1]] %>%
+r <- bioclim[[1]] %>%
   terra::aggregate(fact = 5) %>%
   raster::raster()
 
@@ -128,7 +126,7 @@ bg_mask <- st_read("data/background_mask.gpkg")
 plot(st_geometry(bg_mask))
 
 # mask raster layers one-by-one
-for(i in 15:nlyr(bioclim)){
+for(i in 1:nlyr(bioclim)){
   masked <- terra::mask(bioclim[[i]], vect(bg_mask))
   terra::writeRaster(masked, paste0("data/bg_layers/", names(bioclim)[i], ".tif"))
   print(i)
@@ -274,7 +272,7 @@ nrow(species_data)
 
 
 # extract data ------------------------------------------------------------
-list.files("data/raster_layers/", full.names = T) %>% 
+list.files("data/bg_layers/", full.names = T) %>% 
   rast() %>% 
   plot()
 
@@ -286,7 +284,7 @@ covar <- c("wc2.1_30s_bio_1.tif",
            "wc2.1_30s_bio_14.tif",
            "wc2.1_30s_bio_15.tif")
 
-rst <- rast(paste0("data/raster_layers/", covar)) %>% 
+rst <- rast(paste0("data/bg_layers/", covar)) %>% 
   setNames(c("bio_01", "bio_03", "bio_05", "bio_06", 
              "bio_12", "bio_14", "bio_15"))
 rst[["bio_12"]] <- log(rst[["bio_12"]] + 1) # add 1 to avoid -Inf in log
@@ -303,7 +301,7 @@ evi <- rast("data/evi/evi_virt.vrt") %>%
 rst <- c(rst, evi)
 plot(rst)
 
-for(i in 4:nlyr(rst)){
+for(i in 1:nlyr(rst)){
   terra::writeRaster(
     rst[[i]], 
     paste0("data/raster_scaled/", names(rst)[i], ".tif")
@@ -354,7 +352,7 @@ extr <- c(
   ymax = 54
 )
 
-files <- list.files("data/raster_layers/", full.names = TRUE)
+files <- list.files("data/raster_scaled/", full.names = TRUE)
 files
 
 rst <- rast(files) %>% 

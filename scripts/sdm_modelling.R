@@ -129,7 +129,7 @@ spfname <- paste(
 spfname
 raster::writeRaster(
   x = newpred,
-  filename = sprintf("predictions/%s.tif", spfname),
+  filename = sprintf("predictions_full/%s.tif", spfname),
   overwrite = TRUE
 )
 
@@ -251,7 +251,7 @@ plot(st_geometry(sp_all), add = TRUE)
 library(mapview)
 # plot in mapview
 newpred <- raster::raster(exp(mixmod_pred) * 25000)
-# raster::writeRaster(newpred, "predictions//P_saccharicida.tif", overwrite = TRUE)
+# raster::writeRaster(newpred, "predictions_full//P_saccharicida.tif", overwrite = TRUE)
 mapview::mapview(newpred, 
                  col.regions = terrain.colors(10, rev = TRUE),
                  na.color = NA)
