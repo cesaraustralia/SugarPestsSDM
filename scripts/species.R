@@ -6,7 +6,7 @@ library(sf)
 
 # test a species
 gbif_data <- geodata::sp_occurrence(genus = "Perkinsiella",
-                                    species = "saccharicida")
+                                    species = "*")
 
 sp_coords <- gbif_data %>%
   dplyr::select(lon, lat, status = occurrenceStatus,

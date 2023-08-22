@@ -191,13 +191,13 @@ modelPS <- bam(
     s(PC2, species, bs = "fs", m = 1) +
     s(PC3, bs = "tp", k = 10, m = 2) +
     s(PC3, species, bs = "fs", m = 1) +
-    s(PC6, bs = "tp", k = 10, m = 2) +
-    s(PC6, species, bs = "fs", m = 1) +
+    s(PC4, bs = "tp", k = 10, m = 2) +
+    s(PC4, species, bs = "fs", m = 1) +
     s(species, bs = "re"),
-  data = model_data,
+  data = model_data %>% mutate(wt = ifelse(wt == 1, 1, 1e6)),
   method = "fREML",
   family = binomial(link = "cloglog"),
-  weights = ifelse(model_data$wt == 1, 1, 1e6),
+  # weights = wt,
   # select = TRUE,
   discrete = TRUE,
   control = gam.control(trace = FALSE), 
@@ -218,43 +218,77 @@ extr <- c(
   ymax = 54
 )
 
-rst <- rast_pca %>% 
-  terra::crop(extr)
+aus_SA2 <- read_sf("data/2021_Census/SA2_2021_AUST_GDA2020.shp")
+
+sf_use_s2(F)
+aus <- st_union(aus_SA2)
+sf_use_s2(T)
+
+rst <- rast_pca %>%
+  crop(aus_SA2 %>% vect()) %>%
+  mask(aus_SA2 %>% vect())
+  # terra::crop(extr)
 # terra::aggregate(fact = 5)
 
 plot(rst)
 
-# make species raster
-spname <- "Perkinsiella saccharicida"
-r <- rst[[1]]
-r[] <- spname
-spr <- mask(r, rst[[1]])
-names(spr) <- "species"
-plot(spr)
-
-rast_pred <- c(rst, spr)
-plot(rast_pred)
-
+# make species rasters
 facts <- list(species = levels(as.factor(model_data$species)))
-prediction <- terra::predict(object = rast_pred, 
-                             model = modelPS,   ##******************
-                             # type = "response",
-                             factors = facts)
-plot(prediction)
-plot(terra::app(prediction, fun = plogis))
-plot(exp(prediction) * 2500000)
 
-plot(st_geometry(sp_all[sp_all$species == spname, ]), add = TRUE)
-plot(st_geometry(sp_all), add = TRUE)
+for(i in facts$species){
+  spname <- i
+  r <- rst[[1]]
+  r[] <- spname
+  spr <- mask(r, rst[[1]])
+  names(spr) <- "species"
+  
+  rast_pred <- c(rst, spr)
+  
+  prediction <- terra::predict(object = rast_pred, 
+                               model = modelPS,
+                               type = "response"
+  )
+  
+  rast_lab <- str_split(i, " ")[[1]]
+  rast_lab[1] <- substr(rast_lab[1], 1, 1)
+  rast_lab <- paste(rast_lab, collapse = "_")
+  
+  newpred <- raster::raster(prediction)
+  raster::writeRaster(newpred, paste0("predictions_full//", rast_lab,".tif"), overwrite = TRUE)
+}
 
 
-library(mapview)
-# plot in mapview
-newpred <- raster::raster(exp(mixmod_pred) * 25000)
+# spname <- "Perkinsiella saccharicida"
+# r <- rst[[1]]
+# r[] <- spname
+# spr <- mask(r, rst[[1]])
+# names(spr) <- "species"
+# plot(spr)
+# 
+# rast_pred <- c(rst, spr)
+# plot(rast_pred)
+# 
+# 
+# prediction <- terra::predict(object = rast_pred, 
+#                              model = modelPS,   ##******************
+#                              type = "response"
+#                              # factors = facts
+#                              )
+# plot(prediction)
+# plot(terra::app(prediction, fun = plogis))
+# plot(exp(prediction) * 2500000)
+# 
+# plot(st_geometry(sp_all[sp_all$species == spname, ]), add = TRUE)
+# plot(st_geometry(sp_all), add = TRUE)
+# 
+# 
+# library(mapview)
+# # plot in mapview
+# newpred <- raster::raster(prediction)
 # raster::writeRaster(newpred, "predictions_full//P_saccharicida.tif", overwrite = TRUE)
-mapview::mapview(newpred, 
-                 col.regions = terrain.colors(10, rev = TRUE),
-                 na.color = NA)
+# mapview::mapview(newpred, 
+#                  col.regions = terrain.colors(10, rev = TRUE),
+#                  na.color = NA)
 
 
 
