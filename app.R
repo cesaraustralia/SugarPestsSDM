@@ -16,10 +16,10 @@ library(raster)
 source("Rsource/SwitchButton.R")
 
 # this will be deleted later
-posterior_pred <- read.csv("data/posterior_pred.csv") %>% 
-  mutate(ymd = as.Date(ymd))
-stan_data <- read.csv("data/stan_data.csv") %>% 
-  mutate(ymd = as.Date(ymd))
+# posterior_pred <- read.csv("data/posterior_pred.csv") %>% 
+#   mutate(ymd = as.Date(ymd))
+# stan_data <- read.csv("data/stan_data.csv") %>% 
+#   mutate(ymd = as.Date(ymd))
 
 # species list
 species_list <- c(
@@ -31,8 +31,11 @@ species_list <- c(
   "Y. flavovittatus"
 )
 
+# host list
+host_list <-  c("sugar cane", "barley", "maize", "oats", "rice", "sorghum", "wheat")
+
 ## read species data
-sp_all <- sf::st_read("data/occ_data.gpkg")
+sp_all <- sf::st_read("data/sp_all.gpkg")
 # set a color palette
 sp_palette <- colorFactor(
   palette = viridis::inferno(length(unique(sp_all$species))),
@@ -52,13 +55,13 @@ ui <- shinyUI(
   navbarPage("Sugar Biosecurity",
              selected = "Prediction maps", 
              theme = "button.css",
-
+             
              # Panel 1 -----------------------------------------------------------------
              tabPanel(
                "Prediction maps",
-
+               
                splitLayout(
-
+                 
                  selectizeInput(inputId = "select_map1", 
                                 label = "Select species map",
                                 options = list(dropdownParent = 'body',
@@ -71,18 +74,24 @@ ui <- shinyUI(
                               value = FALSE,
                               col = "GB",
                               type = "TF"),
-               
+                 
                  
                  uiOutput("select2")
                  
                ),
                
+               selectizeInput(inputId = "select_host", 
+                              label = "Select host plant",
+                              options = list(dropdownParent = 'body',
+                                             create = 0),
+                              choices = host_list),
+               
                # map prediction maps
                uiOutput("maps") %>%
                  withSpinner(color = "#428bca")# "#0dc5c1"
-                      
+               
              ),
-
+             
              # Panel 2 -----------------------------------------------------------------
              tabPanel(
                "Occurrence maps",
@@ -90,42 +99,42 @@ ui <- shinyUI(
                leafletOutput("map", height = 600)
                
              ),
-             
-
-
-             # Panel 3 -----------------------------------------------------------------
-             tabPanel(
-               "Seasonal abundance",
-               
-               splitLayout(
-               selectizeInput(inputId = "select_sp", 
-                              label = "Select species",
-                              options = list(dropdownParent = 'body',
-                                             create = 0),
-                              choices = c("P. saccharicida")),
-               
-               # imported function
-               switchButton(inputId = "showunc",
-                            label = "Show uncertainty",
-                            value = FALSE,
-                            col = "GB",
-                            type = "TF"),
-               
-               ),
-               
-               plotOutput("ggplt")       
-             ),
-             
-             
-             tabPanel(
-               "Pathways",
-               HTML("This will be filled.")
-             ),
+             # 
+             # 
+             # 
+             # # Panel 3 -----------------------------------------------------------------
+             # tabPanel(
+             #   "Seasonal abundance",
+             #   
+             #   splitLayout(
+             #   selectizeInput(inputId = "select_sp", 
+             #                  label = "Select species",
+             #                  options = list(dropdownParent = 'body',
+             #                                 create = 0),
+             #                  choices = c("P. saccharicida")),
+             #   
+             #   # imported function
+             #   switchButton(inputId = "showunc",
+             #                label = "Show uncertainty",
+             #                value = FALSE,
+             #                col = "GB",
+             #                type = "TF"),
+             #   
+             #   ),
+             #   
+             #   plotOutput("ggplt")       
+             # ),
+             # 
+             # 
+             # tabPanel(
+             #   "Pathways",
+             #   HTML("This will be filled.")
+             # ),
              
              # Panel 4 -----------------------------------------------------------------
              tabPanel("Info",
                       uiOutput("info")
-               
+                      
              )
              
   )
@@ -152,7 +161,7 @@ server <- function(input, output){
                 title = "Species",
                 opacity = 0.8
       )
-      
+    
   })
   
   output$select2 <- renderUI({
@@ -167,29 +176,43 @@ server <- function(input, output){
   
   map1 <- reactive({
     if(!is.null(input$select_map1)){
-      occurrence <- raster::raster(paste0("predictions/", 
-                                 gsub(". ", "_", input$select_map1), 
-                                 ".tif"))
+      occurrence <- setNames(raster::raster(paste0("predictions/", 
+                                                   gsub(". ", "_", input$select_map1), 
+                                                   ".tif")),
+                             "Habitat Suitability")
+      
+      host <- sf::st_read(paste0("host_shp/", 
+                                 input$select_host, 
+                                 ".gpkg"))
+      
       mapview(occurrence,
               col.regions = terrain.colors(10, rev = TRUE),
-              na.color = NA, height = 600
-      )
+              na.color = NA, height = 600, at = seq(0,1, 0.1), use.layer.names = T
+      ) +
+        mapview(host, legend = FALSE, alpha.regions = 0, color = "red")
     }
   })
   
   map2 <- reactive({
     if(!is.null(input$select_map2)){
-      occurrence <- raster::raster(paste0("predictions/", 
-                                          gsub(". ", "_", input$select_map2), 
-                                          ".tif"))
+      occurrence <- setNames(raster::raster(paste0("predictions/", 
+                                                   gsub(". ", "_", input$select_map2), 
+                                                   ".tif")),
+                             "Habitat Suitability")
+      
+      host <- sf::st_read(paste0("host_shp/", 
+                                 input$select_host, 
+                                 ".gpkg"))
+      
       mapview(occurrence,
               col.regions = terrain.colors(10, rev = TRUE),
-              na.color = NA, height = 600
-      )
+              na.color = NA, height = 600, at = seq(0,1, 0.1), use.layer.names = T
+      ) +
+        mapview(host, legend = FALSE, alpha.regions = 0, color = "red")
     }
   })
   
-
+  
   # the maps
   output$maps <- renderUI({
     
@@ -240,7 +263,7 @@ server <- function(input, output){
     
     plot(g)
   })
-    
+  
   # render HTML page
   # getPage <- function(){
   #   return(includeHTML("modelling_info.html"))

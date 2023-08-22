@@ -128,7 +128,7 @@ plot(st_geometry(bg_mask))
 # mask raster layers one-by-one
 for(i in 1:nlyr(bioclim)){
   masked <- terra::mask(bioclim[[i]], vect(bg_mask))
-  terra::writeRaster(masked, paste0("data/bg_layers/", names(bioclim)[i], ".tif"))
+  terra::writeRaster(masked, paste0("data/bg_layers/", names(bioclim)[i], ".tif"), overwrite = T)
   print(i)
 }
 
@@ -159,7 +159,7 @@ nrow(tgbsp)
 # st_write(tgbsp, "data/tgbs_reduced.gpkg")
 
 tgb_kde <- spatialEco::sp.kde(x = sf::as_Spatial(tgbsp),
-                              bw = 5, # degree
+                              bw = 10, # degree
                               newdata = raster::raster(rs),
                               standardize = TRUE,
                               scale.factor = 10000)
@@ -224,12 +224,27 @@ plot(bmask)
 #                             method = "random") %>% 
 #   raster::raster()
 # create sparate bg records for each species
+countries <- list("Scirpophaga excerptalis" = c("India", "Pakistan", "Bangladesh", "Nepal", "Bhutan", "Myanmar", "Thailand", "Laos", "China", "Taiwan", "Japan", "Thailand", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "East Timor", "Papua New Guinea", "Solomon Islands", "Micronesia", "New Caledonia"),
+                  "Sesamia grisescens" = c("Indonesia", "Papua New Guinea"),
+                  "Chilo infuscatellus" = c("India", "Pakistan", "Afghanistan", "Tajikistan", "Uzbekistan", "Bangladesh", "Nepal", "Bhutan", "Myanmar", "Thailand", "Laos", "China", "Taiwan", "South Korea", "North Korea", "Thailand", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "East Timor", "Papua New Guinea", "Philippines", "Brunei"),
+                  "Eumetopina flavipes" = c("Malaysia", "Brunei", "Indonesia", "Philippines", "Australia", "Papua New Guinea", "Indonesia", "Solomon Islands", "New Caledonia"),
+                  "Yamatotettix flavovittatus" = c("China", "Indonesia", "Japan", "South Korea", "North Korea", "Loas", "Malaysia", "Myanmar", "Papua New Guinea", "Taiwan", "Thailand", "Brunei"),
+                  "Perkinsiella saccharicida" = c("Australia", "Malaysia", "Indonesia", "Brunei", "Philippines", "Papua New Guinea", "India", "Sri Lanka", "Taiwan", "China", "United States", "Mexico", "Costa Rica", "Ecaudor"))
+
+
 bg_df <- data.frame()
 tm <- Sys.time()
 for(i in seq_along(unique(sp_all$species))){
   
-  samples <- dismo::randomPoints(bmask, 
-                                 n = 10000, 
+  bmask_i <- mask(rast(bmask),
+                  geodata::world(path = "data/") %>%
+                    st_as_sf("MULTIPOLYGON") %>%
+                    st_transform("WGS84") %>%
+                    filter(NAME_0 %in% countries[[i]]) %>%
+                    vect())
+  
+  samples <- dismo::randomPoints(raster(bmask_i), 
+                                 n = 1000, 
                                  prob = TRUE)
   
   bg_df <- samples %>% 
@@ -268,28 +283,29 @@ species_data <- bg_df %>%
 head(species_data)
 nrow(species_data)
 
-# st_write(species_data, "data/species_data.gpkg")
+st_write(species_data, "data/species_data.gpkg", append = T)
 
 
 # extract data ------------------------------------------------------------
-list.files("data/bg_layers/", full.names = T) %>% 
-  rast() %>% 
-  plot()
+# list.files("data/bg_layers/", full.names = T) %>% 
+#   rast() %>% 
+#   plot()
+# 
+# covar <- c("wc2.1_30s_bio_1.tif", 
+#            "wc2.1_30s_bio_3.tif", 
+#            "wc2.1_30s_bio_5.tif", 
+#            "wc2.1_30s_bio_6.tif", 
+#            "wc2.1_30s_bio_12.tif",
+#            "wc2.1_30s_bio_14.tif",
+#            "wc2.1_30s_bio_15.tif")
 
-covar <- c("wc2.1_30s_bio_1.tif", 
-           "wc2.1_30s_bio_3.tif", 
-           "wc2.1_30s_bio_5.tif", 
-           "wc2.1_30s_bio_6.tif", 
-           "wc2.1_30s_bio_12.tif",
-           "wc2.1_30s_bio_14.tif",
-           "wc2.1_30s_bio_15.tif")
-
-rst <- rast(paste0("data/bg_layers/", covar)) %>% 
-  setNames(c("bio_01", "bio_03", "bio_05", "bio_06", 
-             "bio_12", "bio_14", "bio_15"))
-rst[["bio_12"]] <- log(rst[["bio_12"]] + 1) # add 1 to avoid -Inf in log
-rst[["bio_14"]] <- log(rst[["bio_14"]] + 1) # add 1 to avoid -Inf in log
-rst <- terra::scale(rst)
+rst <- rast(lapply(list.files("data/bg_layers/", full.names = T), function(x)
+  rast(x) %>% scale())) %>% 
+  setNames(c("bio_01", "bio_10", "bio_11",  "bio_12", "bio_13", "bio_14", "bio_15",
+             "bio_16", "bio_17", "bio_18", "bio_19", "bio_02", "bio_03", "bio_04", 
+             "bio_05", "bio_06", "bio_07", "bio_08", "bio_09"))
+# rst[["bio_12"]] <- log(rst[["bio_12"]] + 1) # add 1 to avoid -Inf in log
+# rst[["bio_14"]] <- log(rst[["bio_14"]] + 1) # add 1 to avoid -Inf in log
 plot(rst)
 
 # read EVI layer
@@ -304,7 +320,8 @@ plot(rst)
 for(i in 1:nlyr(rst)){
   terra::writeRaster(
     rst[[i]], 
-    paste0("data/raster_scaled/", names(rst)[i], ".tif")
+    paste0("data/raster_scaled/", names(rst)[i], ".tif"),
+    overwrite = T
   )
   print(names(rst)[i])
 }
@@ -356,7 +373,7 @@ files <- list.files("data/raster_scaled/", full.names = TRUE)
 files
 
 rst <- rast(files) %>% 
-  terra::crop(extr) %>% 
+  # terra::crop(extr) %>% 
   terra::aggregate(fact = 5)
 
 # principal components of a SpatRaster
@@ -368,7 +385,7 @@ pca <- values(spatSample(rst, 100000, as.raster=TRUE)) %>%
 plot(pca)
 
 rast_pca <- predict(rst, pca)
-plot(rast_pca)
+plot(rast_pca[[1:4]])
 
 # read species occurrence and background samples
 species_data <- st_read("data/species_data.gpkg")

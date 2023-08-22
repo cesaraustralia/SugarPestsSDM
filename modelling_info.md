@@ -29,11 +29,6 @@ Generalized Additive Model (**HGAM**; Pearson et al. 2019) with Point
 Process weighting (Fithian & Hastie 2013) to increase the predictive
 power of the model.
 
-### Modelling seasonal abundance
-
-A state-space model named radom walk was used to model seasonal
-abundance of Perkinsiella in eastern Australia…
-
 ### References
 
 Fithian, W. & Hastie, T. (2013) Finite-sample equivalence in statistical
