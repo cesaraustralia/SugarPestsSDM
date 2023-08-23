@@ -284,7 +284,7 @@ species_data <- bg_df %>%
 head(species_data)
 nrow(species_data)
 
-st_write(species_data, "data/species_data.gpkg", append = T)
+st_write(species_data, "data/species_data.gpkg", append = FALSE)
 
 
 # scale data ------------------------------------------------------------
@@ -348,9 +348,15 @@ nrow(model_data)
 table(model_data$occ)
 table(model_data$species)
 
+write_csv(model_data, "data/model_data.csv")
+
 # modelling ---------------------------------------------------------------------
 library(mgcv)
 library(caret)
+library(biomod2)
+
+model_data <- read_csv("data/model_data.csv") %>%
+  mutate(species = as.factor(species))
 
 set.seed(42)
 trainIndex <- createDataPartition(model_data$species, p = .8, 
@@ -358,8 +364,15 @@ trainIndex <- createDataPartition(model_data$species, p = .8,
                                   times = 1)
 # head(trainIndex)
 
+# calculating the case weights (equal weights)
+# the order of weights should be the same as presences and backgrounds in the training data
+prNum <- as.numeric(table(model_data[trainIndex,]$occ)["1"]) # number of presences
+bgNum <- as.numeric(table(model_data[trainIndex,]$occ)["0"]) # number of backgrounds
+iwt <- ifelse(model_data[trainIndex,]$occ == 1, 1, prNum / bgNum)
+
 modelPS <- bam(
-  occ ~ s(PC1, bs = "tp", k = 10, m = 2) +
+  occ ~
+    s(PC1, bs = "tp", k = 10, m = 2) +
     s(PC1, species, bs = "fs", m = 1) +
     s(PC2, bs = "tp", k = 10, m = 2) +
     s(PC2, species, bs = "fs", m = 1) +
@@ -370,6 +383,7 @@ modelPS <- bam(
     s(species, bs = "re"),
   data = model_data[trainIndex,],
   method = "fREML",
+  weights = iwt,
   family = binomial(link = "cloglog"),
   discrete = TRUE,
   control = gam.control(trace = FALSE), 
@@ -384,10 +398,19 @@ gam.check(modelPS)
 
 test_df <- model_data[-trainIndex,] %>%
   mutate(pred = predict(modelPS,
-                        model_data[-trainIndex,]))
+                        model_data[-trainIndex,],
+                        type = "response"))
 
 plot(pROC::roc(test_df$occ, test_df$pred),
      main = paste0("AUC = ", round(pROC::auc(test_df$occ, test_df$pred), 3)))
+
+thresh_all <- test_df %>%
+  group_by(species, occ) %>%
+  summarise(thresh = quantile(pred, probs = 0.1, na.rm = T)) %>%
+  filter(occ == 1) %>%
+  pull(thresh)
+
+names(thresh_all) <- levels(as.factor(model_data$species))
 
 # spatial prediction ------------------------------------------------------
 aus_SA2 <- read_sf("data/2021_Census/SA2_2021_AUST_GDA2020.shp")
@@ -400,7 +423,7 @@ rst <- rast_pca %>%
   crop(aus_SA2 %>% vect()) %>%
   mask(aus_SA2 %>% vect())
 
-plot(rst)
+plot(rst[[1:4]])
 
 # make species rasters
 facts <- list(species = levels(as.factor(model_data$species)))
@@ -424,7 +447,13 @@ for(i in facts$species){
   rast_lab <- paste(rast_lab, collapse = "_")
   
   newpred <- raster::raster(prediction)
-  raster::writeRaster(newpred, paste0("predictions//", rast_lab,".tif"), overwrite = TRUE)
+  raster::writeRaster(newpred, paste0("predictions//", rast_lab, ".tif"), overwrite = TRUE)
+  
+  newpred_b <- newpred
+  newpred_b[] <- ifelse(newpred_b[] > thresh_all[i], 1, NA)
+  newpred_b <- as.polygons(rast(newpred_b))
+  
+  writeVector(newpred_b, paste0("predictions_binary//", rast_lab, ".gpkg"), overwrite = TRUE)
 }
 
 # mask by host plants ------------------------------------------------------
