@@ -268,7 +268,7 @@ server <- function(input, output){
   # getPage <- function(){
   #   return(includeHTML("modelling_info.html"))
   # }
-  output$info <- renderUI({ includeMarkdown("modelling_info.md") })
+  output$info <- renderUI({ includeHTML("modelling_info.html") })
   
 }
 
