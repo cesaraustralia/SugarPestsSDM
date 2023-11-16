@@ -64,11 +64,20 @@ ui <- shinyUI(
                
                splitLayout(
                  
-                 selectizeInput(inputId = "select_map1", 
-                                label = "Select species map",
-                                options = list(dropdownParent = 'body',
-                                               create = 0),
-                                choices = species_list),
+                 verticalLayout(
+                   
+                   selectizeInput(inputId = "select_map1", 
+                                  label = "Select species map",
+                                  options = list(dropdownParent = 'body',
+                                                 create = 0),
+                                  choices = species_list),
+                   
+                   selectizeInput(inputId = "select_host1", 
+                                  label = "Select host plant",
+                                  options = list(dropdownParent = 'body',
+                                                 create = 0),
+                                  choices = host_list)
+                 ),
                  
                  # imported function
                  switchButton(inputId = "split",
@@ -81,12 +90,6 @@ ui <- shinyUI(
                  uiOutput("select2")
                  
                ),
-               
-               selectizeInput(inputId = "select_host", 
-                              label = "Select host plant",
-                              options = list(dropdownParent = 'body',
-                                             create = 0),
-                              choices = host_list),
                
                # map prediction maps
                uiOutput("maps") %>%
@@ -168,11 +171,18 @@ server <- function(input, output){
   
   output$select2 <- renderUI({
     if(input$split){
-      selectizeInput(inputId = "select_map2", 
-                     label = "Select species map",
-                     options = list(dropdownParent = 'body',
-                                    create = 0),
-                     choices = species_list)
+      verticalLayout(
+        selectizeInput(inputId = "select_map2", 
+                       label = "Select species map",
+                       options = list(dropdownParent = 'body',
+                                      create = 0),
+                       choices = species_list),
+        selectizeInput(inputId = "select_host2", 
+                       label = "Select host plant",
+                       options = list(dropdownParent = 'body',
+                                      create = 0),
+                       choices = host_list)
+      )
     }
   })
   
@@ -186,16 +196,18 @@ server <- function(input, output){
       map_p <- mapview(occurrence,
                        col.regions = RColorBrewer::brewer.pal(9, "YlOrBr"),
                        na.color = NA, height = 600, at = seq(0,1, 0.1),
-                       layer.name = paste0("Habitat Suitability (", input$select_map1, sep = ")")
+                       layer.name = paste0("Habitat Suitability (", input$select_map1, sep = ")"),
+                       query.digits = 2
       )
       
-      if(!input$select_host == "none"){
-        host <- sf::st_read(paste0("host_shp/", 
-                                   input$select_host, 
-                                   ".gpkg"))
+      if(!input$select_host1 == "none"){
+        host1 <- sf::st_read(paste0("host_shp/", 
+                                   input$select_host1, 
+                                   ".gpkg")) %>%
+          dplyr::mutate(host1 = input$select_host1)
         
         map_p <- map_p +
-          mapview(host, legend = FALSE, alpha.regions = .4, color = "darkgrey")
+          mapview(host1, legend = FALSE, alpha.regions = .4, color = "darkgrey", label = host1)
       }
       
       map_p
@@ -212,16 +224,18 @@ server <- function(input, output){
       map_p <- mapview(occurrence,
                        col.regions = RColorBrewer::brewer.pal(9, "YlOrBr"),
                        na.color = NA, height = 600, at = seq(0,1, 0.1),
-                       layer.name = paste0("Habitat Suitability (", input$select_map2, sep = ")")
+                       layer.name = paste0("Habitat Suitability (", input$select_map2, sep = ")"),
+                       query.digits = 2
       )
       
-      if(!input$select_host == "none"){
-        host <- sf::st_read(paste0("host_shp/", 
-                                   input$select_host, 
-                                   ".gpkg"))
+      if(!input$select_host2 == "none"){
+        host2 <- sf::st_read(paste0("host_shp/", 
+                                   input$select_host2, 
+                                   ".gpkg")) %>%
+          dplyr::mutate(host2 = input$select_host2)
         
         map_p <- map_p +
-          mapview(host, legend = FALSE, alpha.regions = .4, color = "darkgrey")
+          mapview(host2, legend = FALSE, alpha.regions = .4, color = "darkgrey", label = host2)
       }
       
       map_p
