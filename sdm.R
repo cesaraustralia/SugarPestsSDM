@@ -359,74 +359,55 @@ model_data <- read_csv("data/model_data.csv") %>%
   mutate(species = as.factor(species))
 
 set.seed(42)
-trainIndex <- createDataPartition(model_data$species, p = .8, 
-                                  list = FALSE, 
-                                  times = 1)
+trainIndex <- createFolds(model_data$species, k = 10, returnTrain = TRUE)
+# trainIndex <- createDataPartition(model_data$species, p = .8, 
+#                                   list = FALSE, 
+#                                   times = 1)
 # head(trainIndex)
 
-# calculating the case weights (equal weights)
-# the order of weights should be the same as presences and backgrounds in the training data
-prNum <- as.numeric(table(model_data[trainIndex,]$occ)["1"]) # number of presences
-bgNum <- as.numeric(table(model_data[trainIndex,]$occ)["0"]) # number of backgrounds
-iwt <- ifelse(model_data[trainIndex,]$occ == 1, 1, prNum / bgNum)
+modelPS <- list()
+AUC <- numeric()
+for(i in 1:length(trainIndex)){
+  # calculating the case weights (equal weights)
+  # the order of weights should be the same as presences and backgrounds in the training data
+  prNum <- as.numeric(table(model_data[trainIndex[[i]],]$occ)["1"]) # number of presences
+  bgNum <- as.numeric(table(model_data[trainIndex[[i]],]$occ)["0"]) # number of backgrounds
+  iwt <- ifelse(model_data[trainIndex[[i]],]$occ == 1, 1, prNum / bgNum)
+  
+  modelPS[[i]] <- bam(
+    occ ~
+      s(PC1, bs = "tp", k = 10, m = 2) +
+      s(PC1, species, bs = "fs", m = 1) +
+      s(PC2, bs = "tp", k = 10, m = 2) +
+      s(PC2, species, bs = "fs", m = 1) +
+      s(PC3, bs = "tp", k = 10, m = 2) +
+      s(PC3, species, bs = "fs", m = 1) +
+      s(PC4, bs = "tp", k = 10, m = 2) +
+      s(PC4, species, bs = "fs", m = 1) +
+      s(species, bs = "re"),
+    data = model_data[trainIndex[[i]],],
+    method = "fREML",
+    weights = iwt,
+    family = binomial(link = "cloglog"),
+    discrete = TRUE,
+    control = gam.control(trace = FALSE), 
+    drop.unused.levels = FALSE
+  )
+  
+  test_df <- model_data[-trainIndex[[i]],] %>%
+    mutate(pred = predict(modelPS[[i]],
+                          model_data[-trainIndex[[i]],],
+                          type = "response"))
+  
+  AUC[[i]] <- pROC::auc(test_df$occ, test_df$pred)
+}
 
-modelPS <- bam(
-  occ ~
-    s(PC1, bs = "tp", k = 10, m = 2) +
-    s(PC1, species, bs = "fs", m = 1) +
-    s(PC2, bs = "tp", k = 10, m = 2) +
-    s(PC2, species, bs = "fs", m = 1) +
-    s(PC3, bs = "tp", k = 10, m = 2) +
-    s(PC3, species, bs = "fs", m = 1) +
-    s(PC4, bs = "tp", k = 10, m = 2) +
-    s(PC4, species, bs = "fs", m = 1) +
-    s(species, bs = "re"),
-  data = model_data[trainIndex,],
-  method = "fREML",
-  weights = iwt,
-  family = binomial(link = "cloglog"),
-  discrete = TRUE,
-  control = gam.control(trace = FALSE), 
-  drop.unused.levels = FALSE
-)
+best_model <- modelPS[[which.max(AUC)]]
 
-summary(modelPS)
-# gratia::draw(modelPS)
-plot(modelPS, pages = 1, rug = FALSE, shade = TRUE)
+summary(best_model)
 
-gratia::smooth_estimates(modelPS) %>%
-  filter(str_detect(smooth, "species")) %>%
-  mutate(smooth = case_when(str_detect(smooth, "PC1") ~ "PC1",
-                            str_detect(smooth, "PC2") ~ "PC2",
-                            str_detect(smooth, "PC3") ~ "PC3",
-                            str_detect(smooth, "PC4") ~ "PC4")) %>%
-  pivot_longer(c(6,8:10)) %>%
-  ggplot(aes(x = value, y = est, colour = species)) +
-  geom_line(linewidth = 1) +
-  facet_wrap(~name, scales = "free") +
-  theme_minimal() +
-  scale_colour_viridis_d(option = "inferno") +
-  theme(legend.position = "bottom") + labs(x = "", y = "")
-
-gam.check(modelPS)
-
-gratia::appraise(modelPS)
-
-test_df <- model_data[-trainIndex,] %>%
-  mutate(pred = predict(modelPS,
-                        model_data[-trainIndex,],
-                        type = "response"))
-
-plot(pROC::roc(test_df$occ, test_df$pred),
-     main = paste0("AUC = ", round(pROC::auc(test_df$occ, test_df$pred), 3)))
-
-thresh_all <- test_df %>%
-  group_by(species, occ) %>%
-  summarise(thresh = quantile(pred, probs = 0.1, na.rm = T)) %>%
-  filter(occ == 1) %>%
-  pull(thresh)
-
-names(thresh_all) <- levels(as.factor(model_data$species))
+gratia::draw(best_model)
+gratia::appraise(best_model)
 
 # spatial prediction ------------------------------------------------------
 aus_SA2 <- read_sf("data/2021_Census/SA2_2021_AUST_GDA2020.shp")
@@ -454,7 +435,7 @@ for(i in facts$species){
   rast_pred <- c(rst, spr)
   
   prediction <- terra::predict(object = rast_pred, 
-                               model = modelPS,
+                               model = best_model,
                                type = "response"
   )
   
@@ -464,12 +445,6 @@ for(i in facts$species){
   
   newpred <- raster::raster(prediction)
   raster::writeRaster(newpred, paste0("predictions//", rast_lab, ".tif"), overwrite = TRUE)
-  
-  newpred_b <- newpred
-  newpred_b[] <- ifelse(newpred_b[] > thresh_all[i], 1, NA)
-  newpred_b <- as.polygons(rast(newpred_b))
-  
-  writeVector(newpred_b, paste0("predictions_binary//", rast_lab, ".gpkg"), overwrite = TRUE)
 }
 
 # mask by host plants ------------------------------------------------------
