@@ -72,7 +72,7 @@ body {
 
 /* GreyBlue */ 
 .GreyBlue .onoffswitch-inner:before {
-  background-color: #FFFFFF; color: #428bca;
+  background-color: #FFFFFF; color: #2C3E50;
 }
 .GreyBlue .onoffswitch-inner:after {
   background-color: #FFFFFF; color: #AAA;
@@ -82,7 +82,7 @@ body {
   border: 1px solid #AAA;
 }
 .GreyBlue .onoffswitch-checkbox:checked + .onoffswitch-label .onoffswitch-switch {
-  background-color: #428bca;
+  background-color: #2C3E50;
 }
 
 /* Text change */
