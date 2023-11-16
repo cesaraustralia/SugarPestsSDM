@@ -410,6 +410,8 @@ gratia::smooth_estimates(modelPS) %>%
 
 gam.check(modelPS)
 
+gratia::appraise(modelPS)
+
 test_df <- model_data[-trainIndex,] %>%
   mutate(pred = predict(modelPS,
                         model_data[-trainIndex,],
