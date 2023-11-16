@@ -327,7 +327,7 @@ set.seed(4326)
 pca <- values(spatSample(rst, 100000, as.raster=TRUE)) %>% 
   na.omit() %>% 
   as.data.frame() %>%
-  prcomp()
+  prcomp(scale. = T)
 plot(pca)
 
 rast_pca <- predict(rst, pca)
@@ -393,6 +393,20 @@ modelPS <- bam(
 summary(modelPS)
 # gratia::draw(modelPS)
 plot(modelPS, pages = 1, rug = FALSE, shade = TRUE)
+
+gratia::smooth_estimates(modelPS) %>%
+  filter(str_detect(smooth, "species")) %>%
+  mutate(smooth = case_when(str_detect(smooth, "PC1") ~ "PC1",
+                            str_detect(smooth, "PC2") ~ "PC2",
+                            str_detect(smooth, "PC3") ~ "PC3",
+                            str_detect(smooth, "PC4") ~ "PC4")) %>%
+  pivot_longer(c(6,8:10)) %>%
+  ggplot(aes(x = value, y = est, colour = species)) +
+  geom_line(linewidth = 1) +
+  facet_wrap(~name, scales = "free") +
+  theme_minimal() +
+  scale_colour_viridis_d(option = "inferno") +
+  theme(legend.position = "bottom") + labs(x = "", y = "")
 
 gam.check(modelPS)
 
