@@ -42,11 +42,11 @@ For each species we created a spatial kernel density estimate around its occurre
 
 Since there are only few records per species, we fitted a logistic binary regression using a Hierarchical Generalized Additive Model (**HGAM**; Pedersen et al. 2019) with Point Process weighting (Fithian & Hastie 2013) to increase the predictive power of the model.
 
-We downloaded global layers of 19 bioclimatic variables representing the mean, extremes, and variation in temperature and precipitation from WorldClim v2.1 (Fick et al. 2017), and a layer of the Landsat Enhanced Vegetation Index (EVI; Masek et al. 2006, Vermote et al. 2016). We then used Principal Coordinate Analysis (PCA) to convert the layers into orthogonal Principal Components (PCs) to reduce colinearity in the predictor variables. We used the 4 first PCs, which collectively explain 91.8% of the variation in the bioclimatic variables, as predictor variables for the HGAM model.
+We downloaded global layers of 19 bioclimatic variables representing the mean, extremes, and variation in temperature and precipitation from WorldClim v2.1 (Fick et al. 2017), and a layer of the Landsat Enhanced Vegetation Index (EVI; Masek et al. 2006, Vermote et al. 2016). We then used Principal Coordinate Analysis (PCA) to convert the layers into orthogonal Principal Components (PCs) to reduce collinearity in the predictor variables. We used the 4 first PCs, which collectively explain 88% of the variation in the bioclimatic variables, as predictor variables for the HGAM model.
 
-The model was trained on a random sample of 80% of the data, and model performance was evaluated by making predictions on the remaining 20% and calculating the area under the receiver operating characteristic curve (AUC). The model achieved good predictive performance, with an AUC score of 0.85.
+We then used 10-fold cross-validation to train the model on random samples of 90% of the data, and evaluate model performance by making predictions on the remaining 10%. We calculated the area under the receiver operating characteristic curve (AUC) for each model trained on each fold, and selected as the best model the one which achieved the highest AUC. The best model achieved excellent predictive performance, with an AUC score of 0.91, and all folds generated models with AUC >= 0.83.
 
-We then used to model to make predictions for all cells in Australia and projected the resultant habitat suitability scores onto a map of Australia.
+We then used the best model to make predictions for all cells in Australia and projected the resultant habitat suitability scores onto a map of Australia.
 
 ### Host plants
 
