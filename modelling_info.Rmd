@@ -3,7 +3,8 @@ title: "Modelling sugar cane pest species distributions"
 author: "Alex Slavenko"
 date: "24-08-2023"
 output:
-  html_document
+  html_document:
+    theme: "flatly"
 ---
 
 ```{r setup, include=FALSE}
@@ -27,7 +28,7 @@ library(knitr)
 kable(sp_all)
 ```
 
-This should be kept in mind, and the SDMs for the species with the lower record counts (especially *E. flavipes* and *Y. flavovittatus*) may be unreliable.
+This should be kept in mind, and the models for species with lower record counts (especially *E. flavipes* and *Y. flavovittatus*) may be unreliable.
 
 #### Background sample
 
@@ -39,9 +40,9 @@ For each species we created a spatial kernel density estimate around its occurre
 
 ### Species distribution modelling
 
-There are only few records per species, so we fitted a logistic binary regressions using a Hierarchical Generalized Additive Model (**HGAM**; Pedersen et al. 2019) with Point Process weighting (Fithian & Hastie 2013) to increase the predictive power of the model.
+Since there are only few records per species, we fitted a logistic binary regression using a Hierarchical Generalized Additive Model (**HGAM**; Pedersen et al. 2019) with Point Process weighting (Fithian & Hastie 2013) to increase the predictive power of the model.
 
-We downloaded global layers of 19 bioclimatic variables representing the mean, extremes, and variation in temperature and precipitation from WorldClim v2.1 (Fick et al. 2017), and a layer of the Landsat Enhanced Vegetation Index (EVI; Masek et al. 2006, Vermote et al. 2016). We then used Principal Coordinate Analysis (PCA) to convert the layers into orthogonal Principal Components (PCs) to reduce collinearity in the predictor variables. We used the 4 first PCs, which collectively explain 91.8% of the variation in the bioclimatic variables, as predictor variables for the HGAM model.
+We downloaded global layers of 19 bioclimatic variables representing the mean, extremes, and variation in temperature and precipitation from WorldClim v2.1 (Fick et al. 2017), and a layer of the Landsat Enhanced Vegetation Index (EVI; Masek et al. 2006, Vermote et al. 2016). We then used Principal Coordinate Analysis (PCA) to convert the layers into orthogonal Principal Components (PCs) to reduce colinearity in the predictor variables. We used the 4 first PCs, which collectively explain 91.8% of the variation in the bioclimatic variables, as predictor variables for the HGAM model.
 
 The model was trained on a random sample of 80% of the data, and model performance was evaluated by making predictions on the remaining 20% and calculating the area under the receiver operating characteristic curve (AUC). The model achieved good predictive performance, with an AUC score of 0.85.
 
@@ -49,7 +50,7 @@ We then used to model to make predictions for all cells in Australia and project
 
 ### Host plants
 
-To see how climatic suitability coincides with host plant suitability in Australia, we downloaded the Catchment Scale Land Use of Australia – Commodities – Update December 2020 dataset (ABARES 2021), which shows the location and extent of select agricultural, mining and forest product commodities. We filtered this to include sugar cane, as well as other crops identified as host plants for some of the six considered pests: barley, maize, oats, rice, sorghum, and wheat. The extent of each of these commodities' growing regions can be plotted on top of the climatic suitability maps.
+To see how climatic suitability coincides with host plant suitability in Australia, we downloaded a dataset showing the location and extent of select agricultural, mining and forest product commodities from the Catchment Scale Land Use of Australia – Commodities – Update December 2020 (ABARES 2021). We filtered this to include sugar cane, as well as other crops identified as host plants for some of the six considered pests: barley, maize, oats, rice, sorghum, and wheat. The extent of each of these commodities' growing regions can be plotted on top of the climatic suitability maps.
 
 ### References
 

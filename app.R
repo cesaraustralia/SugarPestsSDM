@@ -32,7 +32,7 @@ species_list <- c(
 )
 
 # host list
-host_list <-  c("sugar cane", "barley", "maize", "oats", "rice", "sorghum", "wheat")
+host_list <-  c("none", "sugar cane", "barley", "maize", "oats", "rice", "sorghum", "wheat")
 
 ## read species data
 sp_all <- sf::st_read("data/sp_all.gpkg")
@@ -53,12 +53,14 @@ myRenderMapview <- function(expr, env = parent.frame(), quoted = FALSE){
 
 ui <- shinyUI(
   navbarPage("Sugar Biosecurity",
-             selected = "Prediction maps", 
-             theme = "button.css",
+             selected = "Prediction maps",
+             theme = shinytheme("flatly"),
+             
              
              # Panel 1 -----------------------------------------------------------------
              tabPanel(
                "Prediction maps",
+               includeCSS("www/button.css"),
                
                splitLayout(
                  
@@ -88,7 +90,7 @@ ui <- shinyUI(
                
                # map prediction maps
                uiOutput("maps") %>%
-                 withSpinner(color = "#428bca")# "#0dc5c1"
+                 withSpinner(color = "#2C3E50", type = 6)# "#0dc5c1"
                
              ),
              
@@ -181,15 +183,22 @@ server <- function(input, output){
                                                    ".tif")),
                              "Habitat Suitability")
       
-      host <- sf::st_read(paste0("host_shp/", 
-                                 input$select_host, 
-                                 ".gpkg"))
+      map_p <- mapview(occurrence,
+                       col.regions = RColorBrewer::brewer.pal(9, "YlOrBr"),
+                       na.color = NA, height = 600, at = seq(0,1, 0.1),
+                       layer.name = paste0("Habitat Suitability (", input$select_map1, sep = ")")
+      )
       
-      mapview(occurrence,
-              col.regions = terrain.colors(10, rev = TRUE),
-              na.color = NA, height = 600, at = seq(0,1, 0.1), use.layer.names = T
-      ) +
-        mapview(host, legend = FALSE, alpha.regions = 0, color = "red")
+      if(!input$select_host == "none"){
+        host <- sf::st_read(paste0("host_shp/", 
+                                   input$select_host, 
+                                   ".gpkg"))
+        
+        map_p <- map_p +
+          mapview(host, legend = FALSE, alpha.regions = .4, color = "darkgrey")
+      }
+      
+      map_p
     }
   })
   
@@ -200,15 +209,22 @@ server <- function(input, output){
                                                    ".tif")),
                              "Habitat Suitability")
       
-      host <- sf::st_read(paste0("host_shp/", 
-                                 input$select_host, 
-                                 ".gpkg"))
+      map_p <- mapview(occurrence,
+                       col.regions = RColorBrewer::brewer.pal(9, "YlOrBr"),
+                       na.color = NA, height = 600, at = seq(0,1, 0.1),
+                       layer.name = paste0("Habitat Suitability (", input$select_map2, sep = ")")
+      )
       
-      mapview(occurrence,
-              col.regions = terrain.colors(10, rev = TRUE),
-              na.color = NA, height = 600, at = seq(0,1, 0.1), use.layer.names = T
-      ) +
-        mapview(host, legend = FALSE, alpha.regions = 0, color = "red")
+      if(!input$select_host == "none"){
+        host <- sf::st_read(paste0("host_shp/", 
+                                   input$select_host, 
+                                   ".gpkg"))
+        
+        map_p <- map_p +
+          mapview(host, legend = FALSE, alpha.regions = .4, color = "darkgrey")
+      }
+      
+      map_p
     }
   })
   
