@@ -207,7 +207,8 @@ server <- function(input, output){
           dplyr::mutate(host1 = input$select_host1)
         
         map_p <- map_p +
-          mapview(host1, legend = FALSE, alpha.regions = .4, color = "darkgrey", label = host1)
+          mapview(host1, legend = FALSE, alpha.regions = .4, color = "darkgrey", label = host1,
+                  layer.name = input$select_host1)
       }
       
       map_p
@@ -235,7 +236,8 @@ server <- function(input, output){
           dplyr::mutate(host2 = input$select_host2)
         
         map_p <- map_p +
-          mapview(host2, legend = FALSE, alpha.regions = .4, color = "darkgrey", label = host2)
+          mapview(host2, legend = FALSE, alpha.regions = .4, color = "darkgrey", label = host2,
+                  layer.name = input$select_host2)
       }
       
       map_p
