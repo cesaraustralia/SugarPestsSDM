@@ -427,9 +427,9 @@ unique records varied greatly between species:</p>
 </tr>
 </tbody>
 </table>
-<p>Due to data limitations, models for most species are unreliable.
-Therefore, model outputs are only presented for the relatively well
-sampled <em>P. saccharicida</em> and <em>S. excerptalis</em>.</p>
+<p>Due to data limitations, some model outputs my be unreliable and
+should be interpreted with caution, particularly for species with low
+sample sizes.</p>
 </div>
 <div id="background-sample" class="section level4">
 <h4>Background sample</h4>
@@ -452,12 +452,12 @@ spatial kernel density estimate.</p>
 </div>
 <div id="species-distribution-modelling" class="section level3">
 <h3>Species distribution modelling</h3>
-<p>We used an ensemble approach for species distribution modelling
-(Araujo &amp; New 2007) - we fit five different models (Generalised
-Additive Model [GAM], Gradient Boosting Machine [GBM], Generalised
-Linear Modle [GLM], Maximum Entropy [MaxEnt] and Random Forests [RF])
-and calculated a weighted average of the model predictions based on
-model accuracy.</p>
+<!-- We used an ensemble approach for species distribution modelling (Araujo & New 2007) - we fit five different models (Generalised Additive Model [GAM], Gradient Boosting Machine [GBM], Generalised Linear Modle [GLM], Maximum Entropy [MaxEnt] and Random Forests [RF]) and calculated a weighted average of the model predictions based on model accuracy. -->
+<p>Since there are only few records per species, we fitted a logistic
+binary regression using a Hierarchical Generalized Additive Model
+(<strong>HGAM</strong>; Pedersen <em>et al.</em> 2019) with Point
+Process weighting (Fithian &amp; Hastie 2013) to increase the predictive
+power of the model.</p>
 <p>We downloaded global layers of 19 bioclimatic variables representing
 the mean, extremes, and variation in temperature and precipitation from
 WorldClim v2.1 (Fick <em>et al.</em>. 2017), and a layer of the Landsat
@@ -467,16 +467,18 @@ to convert the layers into orthogonal Principal Components (PCs) to
 reduce collinearity in the predictor variables. We used the 4 first PCs,
 which collectively explain 88% of the variation in the bioclimatic
 variables, as predictor variables.</p>
-<p>We then used block cross-validation (Muscarella <em>et al.</em>.
-2014) to evaluate model performance by splitting the data into four
-geographical blocks (bottom-right, bottom-left, top-right, and
-top-left). We calculated the True Skill Statistic (TSS; Allouche <em>et
-al.</em>. 2006) for each model and each block, and generated ensemble
-models for each species by averaging all models and blocks weighted by
-their TSS scores.</p>
-<p>We then used the ensemble model for each species to make predictions
-for all cells in Australia and projected the resultant habitat
-suitability scores onto a map of Australia.</p>
+<!-- We then used block cross-validation (Muscarella *et al.*. 2014) to evaluate model performance by splitting the data into four geographical blocks (bottom-right, bottom-left, top-right, and top-left). We calculated the True Skill Statistic (TSS; Allouche *et al.*. 2006) for each model and each block, and generated ensemble models for each species by averaging all models and blocks weighted by their TSS scores. -->
+<p>We then used 10-fold cross-validation to train the model on random
+samples of 90% of the data, and evaluate model performance by making
+predictions on the remaining 10%. We calculated the area under the
+receiver operating characteristic curve (AUC) for each model trained on
+each fold, and selected as the best model the one which achieved the
+highest AUC. The best model achieved excellent predictive performance,
+with an AUC score of 0.91.</p>
+<!-- We then used the ensemble model for each species to make predictions for all cells in Australia and projected the resultant habitat suitability scores onto a map of Australia. -->
+<p>We then used the best model to make predictions for all cells in
+Australia and projected the resultant habitat suitability scores onto a
+map of Australia.</p>
 </div>
 <div id="host-plants" class="section level3">
 <h3>Host plants</h3>
@@ -505,6 +507,9 @@ distributions. <em>Trends in Ecology &amp; Evolution</em>
 <p>Fick, S.E. &amp; Hijmans, R.J. (2017) WorldClim 2: new 1km spatial
 resolution climate surfaces for global land areas. <em>International
 Journal of Climatology</em> <strong>37</strong>, 4302–4315.</p>
+<p>Fithian, W. &amp; Hastie, T. (2013) Finite-sample equivalence in
+statistical models for presence-only data. <em>The Annals of Applied
+Statistics</em> <strong>7</strong>, 1917–1939.</p>
 <p>Masek, J.G., Vermote, E.F., Saleous, N., Wolfe, R., Hall, F.G.,
 Huemmrich, F., Gao, F., Kutler, J. &amp; Lim, T.K. (2006) A Landsat
 surface reflectance data set for North America, 1990-100. <em>IEEE
@@ -515,6 +520,9 @@ J.M., Uriarte, M. &amp; Anderson, R.P. (2014) ENMeval: An R package for
 conducting spatially independent evaluations and estimating optimal
 model complexity for Maxent ecological niche models. <em>Methods in
 Ecology and Evolution</em> <strong>5</strong>, 1198-1205.</p>
+<p>Pedersen, E.J., Miller, D.L., Simpson, G.L. &amp; Ross, N. (2019)
+Hierarchical generalized additive models in ecology: an introduction
+with mgcv. <em>PeerJ</em> <strong>7</strong>, e6876.</p>
 <p>Phillips, S.J., Dudik, M., Elith, J., Graham, C.H., Lehmann, A.,
 Leathwick, J. &amp; Ferrier, S. (2009) Sample selection bias and
 presence-only distribution models: implications for background and
