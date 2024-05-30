@@ -24,7 +24,12 @@ source("Rsource/SwitchButton.R")
 # species list
 species_list <- c(
   "P. saccharicida",
-  "S. excerptalis"
+  "S. excerptalis",
+  "C. auricilia",
+  "C. infuscatellus",
+  "E. flavipes",
+  "S. grisescens",
+  "Y. flavovittatus"
 )
 
 # countries
