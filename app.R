@@ -24,18 +24,23 @@ source("Rsource/SwitchButton.R")
 # species list
 species_list <- c(
   "P. saccharicida",
-  "C. infuscatellus",
-  "E. flavipes",
-  "S. excerptalis",
-  "S. grisescens",
-  "Y. flavovittatus"
+  "S. excerptalis"
 )
+
+# countries
+countries <- terra::vect("data/countries.gpkg")
 
 # host list
 host_list <-  c("none", "sugar cane", "barley", "maize", "oats", "rice", "sorghum", "wheat")
 
 ## read species data
-sp_all <- sf::st_read("data/sp_all.gpkg")
+df_files <- dir("database", full.names = T)
+timestamps <- file.info(df_files)$ctime
+
+latest_df <- which.max(timestamps)
+
+sp_all <- read_csv(df_files[latest_df])
+
 # set a color palette
 sp_palette <- colorFactor(
   palette = viridis::inferno(length(unique(sp_all$species))),
@@ -55,7 +60,6 @@ ui <- shinyUI(
   navbarPage("Sugar Biosecurity",
              selected = "Prediction maps",
              theme = shinytheme("flatly"),
-             
              
              # Panel 1 -----------------------------------------------------------------
              tabPanel(
@@ -104,37 +108,21 @@ ui <- shinyUI(
                leafletOutput("map", height = 600)
                
              ),
-             # 
-             # 
-             # 
-             # # Panel 3 -----------------------------------------------------------------
-             # tabPanel(
-             #   "Seasonal abundance",
-             #   
-             #   splitLayout(
-             #   selectizeInput(inputId = "select_sp", 
-             #                  label = "Select species",
-             #                  options = list(dropdownParent = 'body',
-             #                                 create = 0),
-             #                  choices = c("P. saccharicida")),
-             #   
-             #   # imported function
-             #   switchButton(inputId = "showunc",
-             #                label = "Show uncertainty",
-             #                value = FALSE,
-             #                col = "GB",
-             #                type = "TF"),
-             #   
-             #   ),
-             #   
-             #   plotOutput("ggplt")       
-             # ),
-             # 
-             # 
-             # tabPanel(
-             #   "Pathways",
-             #   HTML("This will be filled.")
-             # ),
+             
+             # Panel 3 -----------------------------------------------------------------
+             tabPanel(
+               "Upload data",
+               
+               fluidPage(
+                 shinyjs::useShinyjs(),
+                 fluidRow(
+                   actionButton("add_button", "Add", icon("plus")),
+                   downloadButton("download_button", "Download", icon("download"))
+                 ),
+                 br(),
+                 DT::dataTableOutput("outtbl")
+               )
+             ),
              
              # Panel 4 -----------------------------------------------------------------
              tabPanel("Info",
@@ -153,7 +141,7 @@ server <- function(input, output){
       addTiles() %>%
       addProviderTiles(providers$CartoDB.Positron) %>% 
       addCircleMarkers(
-        data = sp_all,
+        data = sp_all %>% st_as_sf(coords = c("longitude", "latitude"), crs = "WGS84"),
         radius = 6,
         stroke = FALSE,
         label = ~species,
@@ -202,8 +190,8 @@ server <- function(input, output){
       
       if(!input$select_host1 == "none"){
         host1 <- sf::st_read(paste0("host_shp/", 
-                                   input$select_host1, 
-                                   ".gpkg")) %>%
+                                    input$select_host1, 
+                                    ".gpkg")) %>%
           dplyr::mutate(host1 = input$select_host1)
         
         map_p <- map_p +
@@ -231,8 +219,8 @@ server <- function(input, output){
       
       if(!input$select_host2 == "none"){
         host2 <- sf::st_read(paste0("host_shp/", 
-                                   input$select_host2, 
-                                   ".gpkg")) %>%
+                                    input$select_host2, 
+                                    ".gpkg")) %>%
           dplyr::mutate(host2 = input$select_host2)
         
         map_p <- map_p +
@@ -260,41 +248,128 @@ server <- function(input, output){
     
   })
   
+  # Render the table view
+  output$outtbl <- DT::renderDataTable({
+      
+      DT::datatable(
+        sp_all,
+        filter = "top",
+        options = list(scrollX = T)
+        # ,rownames = F
+      )
+    })
   
-  # seasonal abundance
-  output$ggplt <- renderPlot({
-    # ggplot(data = posterior_pred, 
-    #        aes(x = ym, y = med, group = 1)) +
-    #   geom_point() +
-    #   geom_path() +
-    #   geom_ribbon(aes(ymin = med - 2*sd, ymax = med + 2*sd), alpha = 0.1) +
-    #   geom_point(data = stan_data, aes(x =ym, y = num), color = "red") +
-    #   theme_bw() +
-    #   theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
-    #   labs(x = "Time", y = "Total observed Perkinsiella")
-    g <- ggplot(data = posterior_pred, aes(x = ymd)) +
-      geom_point(aes(x = ymd, y = med, group = 1, color = "Predicted"),
-                 size = 2, shape = 16, data = posterior_pred) +
-      geom_path(aes(x = ymd, y = med, group = 1), alpha = 0.8, data = posterior_pred) +
-      geom_point(aes(x = ymd, y = num, color = "Observed"),
-                 shape = 5, size = 3, data = stan_data) +
-      theme_minimal() +
-      theme(axis.text.x = element_text(angle = 45, hjust = 0.9)) +
-      scale_x_date(date_breaks = "3 months",
-                   date_labels = "%b %Y") +
-      labs(x = "Date", y = "Total observed Perkinsiella", color = "")
+  ## Add new row ##
+  observeEvent(input$add_button, priority = 20, {
+    showModal(modalDialog(div(
+      id = ("entry_form"),
+      tags$head(tags$style(".modal-dialog{ width:1600px}")),
+      #Modify the width of the dialog
+      tags$head(tags$style(
+        HTML(".shiny-split-layout > div {overflow: visible}")
+      )),
+      #Necessary to show the input options
+      fluidPage(
+        splitLayout(textInput(inputId = "col_species", label = "Species", value = ''),
+                    numericInput(inputId = "col_longitude", label = "Longitude", value = 0),
+                    numericInput(inputId = "col_latitude", label = "Latitude", value = 0),
+                    textInput(inputId = "col_source", label = "Your name", value = '')),
+        actionButton(
+          inputId = "submit_add",
+          label = "Submit to database",
+          icon = icon("database")
+        ),
+        easyClose = TRUE
+      )
+    )))
+  })
+  
+  # Submit new data to table
+  observeEvent(input$submit_add, priority = 20, {
     
-    if(input$showunc){
-      g <- g +
-        geom_ribbon(aes(ymin = ifelse(med - 2 * sd < 0, 0, med - 2 * sd),
-                        ymax = med + 2 * sd, 
-                        group = 1),
-                    alpha = 0.2,
-                    data = posterior_pred)
+    new_row <-
+      tibble(species = input$col_species,
+             longitude = input$col_longitude,
+             latitude = input$col_latitude,
+             source = input$col_source)
+    
+    new_row$country = terra::extract(countries, new_row[,c(2,3)])[,2]
+    
+    # update table
+    sp_all <-
+      bind_rows(sp_all,
+                new_row)
+    
+    # save table
+    new_df_name <- paste0("database/sugarcane_pests_database_", lubridate::today(), ".csv")
+    
+    
+    n = 0
+    while(new_df_name %in% df_files){
+      n = n + 1
+      new_df_name <- paste0("database/sugarcane_pests_database_", lubridate::today(), "_", n, ".csv")
     }
     
-    plot(g)
+    write_csv(sp_all,
+              new_df_name)
+    
+    showNotification(
+      sprintf("Entry successfully added to table"),
+      duration = 3,
+      closeButton = FALSE,
+      type = "message"
+    )
+    
+    ## update outputs
+    # set a color palette
+    sp_palette <- colorFactor(
+      palette = viridis::inferno(length(unique(sp_all$species))),
+      domain = unique(sp_all$species)
+    )
+    
+    output$map <- renderLeaflet({
+      leaflet() %>% 
+        addTiles() %>%
+        addProviderTiles(providers$CartoDB.Positron) %>% 
+        addCircleMarkers(
+          data = sp_all %>% st_as_sf(coords = c("longitude", "latitude"), crs = "WGS84"),
+          radius = 6,
+          stroke = FALSE,
+          label = ~species,
+          color = ~sp_palette(species),
+          fillOpacity = 0.4
+        ) %>% 
+        addLegend(position = "bottomleft", 
+                  pal = sp_palette,
+                  values = sp_all$species,
+                  title = "Species",
+                  opacity = 0.8
+        )
+      
+    })
+    
+    output$outtbl <- 
+      DT::renderDataTable({
+        
+        DT::datatable(
+          sp_all,
+          filter = "top",
+          options = list(scrollX = T)
+          # ,rownames = F
+        )
+      })
+    
   })
+  
+  ## Download timestamped csv of selected data set ##
+  output$download_button <- downloadHandler(
+    filename <- function() {
+      paste0("sugarcane_pests_database_", lubridate::today(), ".csv")
+    },
+    content <- function(file) {
+      write.csv(sp_all[input$outtbl_rows_all,], file, row.names = FALSE)
+    }
+  )
   
   # render HTML page
   # getPage <- function(){

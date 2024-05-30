@@ -9,6 +9,7 @@ library(terra)
 species <- c(
   "Scirpophaga excerptalis",
   "Sesamia grisescens",
+  "Chilo auricilia",
   "Chilo infuscatellus",
   "Eumetopina flavipes",
   "Yamatotettix flavovittatus",
@@ -19,6 +20,7 @@ species <- c(
 countries <- list(
   "Scirpophaga excerptalis" = c("India", "Pakistan", "Bangladesh", "Nepal", "Bhutan", "Myanmar", "Thailand", "Laos", "China", "Taiwan", "Japan", "Thailand", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "East Timor", "Papua New Guinea", "Solomon Islands", "Micronesia", "New Caledonia"),
   "Sesamia grisescens" = c("Indonesia", "Papua New Guinea"),
+  "Chilio auricilia" = c("Bangladesh", "Bhutan", "Cambodia", "China", "India", "Indonesia", "Laos", "Malaysia", "Myanmar", "Nepal", "Pakistan", "Papua New Guinea", "Philippines", "Sri Lanka", "Taiwan", "Thailand", "Vietnam"),
   "Chilo infuscatellus" = c("India", "Pakistan", "Afghanistan", "Tajikistan", "Uzbekistan", "Bangladesh", "Nepal", "Bhutan", "Myanmar", "Thailand", "Laos", "China", "Taiwan", "South Korea", "North Korea", "Thailand", "Cambodia", "Vietnam", "Malaysia", "Singapore", "Indonesia", "East Timor", "Papua New Guinea", "Philippines", "Brunei"),
   "Eumetopina flavipes" = c("Malaysia", "Brunei", "Indonesia", "Philippines", "Australia", "Papua New Guinea", "Indonesia", "Solomon Islands", "New Caledonia"),
   "Yamatotettix flavovittatus" = c("China", "Indonesia", "Japan", "South Korea", "North Korea", "Laos", "Malaysia", "Myanmar", "Papua New Guinea", "Taiwan", "Thailand", "Brunei"),
@@ -99,7 +101,7 @@ bioclim <- geodata::worldclim_global(var = "bio",
                                      path = "data/bioclim.tif")
 
 plot(bioclim[[1]])
-plot(sp_all$geometry, add = TRUE)
+plot(sp_all$geom, add = TRUE)
 
 # leaflet() %>%
 #   addTiles() %>%
@@ -159,7 +161,7 @@ for(i in seq_along(species)){
   # read a raster mask for the region
   rs <- terra::rast(paste0("data/bg_layers/", species[i], "/wc2.1_30s_bio_1.tif"))
   
-  if(!i == 6){
+  if(!i == 7){
     rs <- rs %>%
       crop(geodata::world(path = "data/") %>%
              st_as_sf("MULTIPOLYGON") %>%
@@ -334,10 +336,11 @@ rast_pca <- predict(rst, pca)
 plot(rast_pca[[1:4]])
 
 # read species occurrence and background samples
-species_data <- st_read("data/species_data.gpkg")
+species_data <- st_read("data/species_data.gpkg") %>%
+  unique()
 
 # create the training date for modelling
-model_data <- terra::extract(rast_pca, vect(species_data)) %>% 
+model_data <- terra::extract(rast_pca, vect(species_data), xy = T) %>% 
   mutate(occ = species_data$occ,
          species = as.factor(species_data$species),
          wt = species_data$wt) %>% 
@@ -351,6 +354,7 @@ table(model_data$species)
 write_csv(model_data, "data/model_data.csv")
 
 # modelling ---------------------------------------------------------------------
+## HGAM ##
 library(mgcv)
 library(caret)
 library(biomod2)
@@ -444,7 +448,163 @@ for(i in facts$species){
   rast_lab <- paste(rast_lab, collapse = "_")
   
   newpred <- raster::raster(prediction)
-  raster::writeRaster(newpred, paste0("predictions//", rast_lab, ".tif"), overwrite = TRUE)
+  raster::writeRaster(newpred, paste0("hgam//", rast_lab, ".tif"), overwrite = TRUE)
+}
+
+## RANGE BAGGING ##
+model_data <- read_csv("data/model_data.csv") %>%
+  filter(!species %in% c("Eumetopina flavipes", "Yamatotettix flavovittatus", "Sesamia grisescens")) %>% # sample size too low
+  mutate(species = as.factor(species))
+
+facts <- list(species = levels(as.factor(model_data$species)))
+
+for(i in facts$species){
+  spname <- i
+  
+  # Range bagging
+  n_models = 100
+  n_dim = 3
+  sample_prop = 0.5
+  
+  training <- model_data %>% filter(species == spname, occ == 1)
+  training <- training[,2:21]
+  
+  models <- list()
+  
+  set.seed(42)
+  for(k in 1:n_models){
+    # Sample {sample_prop} data rows and {n_dim} variable columns
+    # all
+    vars <- sample(ncol(training), size = n_dim,
+                   replace = FALSE)
+    rows <- sample(nrow(training), ceiling(sample_prop*nrow(training)),
+                   replace = FALSE)
+    sample_data <- training[rows, vars]
+    
+    models[[k]] <- sample_data[unique(as.vector(
+      geometry::convhulln(sample_data, options = 'Pp'))),] 
+  }
+  
+  # Extract data values for object variables
+  s_data <- raster::as.data.frame(rst, xy = TRUE, na.rm = TRUE)
+  s_coords <- s_data[, c("x", "y")]
+  s_data <- as.matrix(s_data[, 3:22])
+  
+  # Count the number of convex hull model fits for each x data row/cell
+  counts <- numeric(nrow(s_data))
+  for (k in 1:n_models) {
+    vars <- colnames(models[[k]])
+    data_in_ch <- geometry::inhulln(
+      geometry::convhulln(models[[k]], options = 'Pp'),
+      s_data[, vars])
+    counts <- counts + data_in_ch
+  }
+  
+  # Return the count fraction as a raster
+  prediction <- raster::extend(
+    raster::rasterFromXYZ(cbind(s_coords, predicted = counts/n_models),
+                          res = raster::res(raster::raster(rst)), crs = raster::crs(raster::raster(rst))),
+    raster::extent(raster::raster(rst)))
+  
+  rast_lab <- str_split(i, " ")[[1]]
+  rast_lab[1] <- substr(rast_lab[1], 1, 1)
+  rast_lab <- paste(rast_lab, collapse = "_")
+  
+  raster::writeRaster(prediction, paste0("range bagging//", rast_lab, ".tif"), overwrite = TRUE)
+}
+
+## ENSEMBLE ##
+library(biomod2)
+
+jar <-
+  paste(system.file(package = "dismo"), "/java/maxent.jar", sep = '')
+
+model_data <- read_csv("data/model_data.csv") %>%
+  mutate(species = as.factor(species))
+
+facts <- list(species = levels(as.factor(model_data$species)))
+
+
+for(i in facts$species){
+  spname <- i
+  
+  training <- model_data %>% filter(species == spname)
+  
+  biomod_data <- BIOMOD_FormatingData(resp.var = training$occ,
+                                      expl.var = training[,2:21],
+                                      resp.xy = training[,22:23],
+                                      resp.name = "occ",
+                                      na.rm = TRUE)
+  
+  # generate SDMs
+  biomod_options <- BIOMOD_ModelingOptions(GBM = list(distribution = "bernoulli",
+                                                      n.trees = 2500,
+                                                      interaction.depth = 3,
+                                                      n.minobsinnode = 5,
+                                                      learning.rate = 0.01,
+                                                      bag.fraction = 0.75,
+                                                      train.fraction = 1,
+                                                      keep.data = FALSE,
+                                                      verbose = FALSE,
+                                                      n.cores = 1),
+                                           GLM = list(type = 'quadratic',
+                                                      interaction.level = 0,
+                                                      myFormula = NULL,
+                                                      test = 'AIC',
+                                                      family = binomial(link = 'logit'),
+                                                      mustart = 0.5,
+                                                      control = glm.control(epsilon = 1e-08, maxit = 50, trace = FALSE)),
+                                           MAXENT = list(path_to_maxent.jar = jar, 
+                                                         memory_allocated = 512,
+                                                         initial_heap_size = NULL,
+                                                         maximum_heap_size = NULL,
+                                                         background_data_dir = 'default',
+                                                         maximumbackground = 'default',
+                                                         maximumiterations = 200,
+                                                         visible = FALSE,
+                                                         linear = TRUE,
+                                                         quadratic = TRUE,
+                                                         product = TRUE,
+                                                         threshold = TRUE,
+                                                         hinge = TRUE,
+                                                         lq2lqptthreshold = 80,
+                                                         l2lqthreshold = 10,
+                                                         hingethreshold = 15,
+                                                         beta_threshold = -1,
+                                                         beta_categorical = -1,
+                                                         beta_lqp = -1,
+                                                         beta_hinge = -1,
+                                                         betamultiplier = 1,
+                                                         defaultprevalence = 0.5))
+  
+  biomod_model_out <- BIOMOD_Modeling(biomod_data,
+                                      models = c('GBM','GLM','GAM','MAXENT','RF'),
+                                      bm.options = biomod_options,
+                                      CV.strategy = 'block',
+                                      metric.eval = c('ROC', 'TSS'),
+                                      weights = training$wt,
+                                      seed.val = 42)
+  
+  # generate ensemble model
+  ens_model <- BIOMOD_EnsembleModeling(biomod_model_out,
+                                       em.by = "all",
+                                       em.algo = 'EMwmean',
+                                       metric.eval = c('ROC', 'TSS'))
+  
+  ens_pred <- BIOMOD_EnsembleForecasting(bm.em = ens_model,
+                                         models.chosen = get_built_models(ens_model)[[2]],
+                                         proj.name = "ens",
+                                         new.env = rst,
+                                         build.clamping.mask = FALSE,
+                                         output.format = ".tif")
+  
+  pr <- raster::raster(get_predictions(ens_pred)/1000)
+  
+  rast_lab <- str_split(i, " ")[[1]]
+  rast_lab[1] <- substr(rast_lab[1], 1, 1)
+  rast_lab <- paste(rast_lab, collapse = "_")
+  
+  raster::writeRaster(pr, paste0("ensemble//", rast_lab, ".tif"), overwrite = TRUE)
 }
 
 # mask by host plants ------------------------------------------------------

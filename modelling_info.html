@@ -370,7 +370,7 @@ display: none;
 <h1 class="title toc-ignore">Modelling sugar cane pest species
 distributions</h1>
 <h4 class="author">Alex Slavenko</h4>
-<h4 class="date">24-08-2023</h4>
+<h4 class="date">27-05-2024</h4>
 
 </div>
 
@@ -383,12 +383,12 @@ distributions</h1>
 Facility (<strong>GBIF</strong>; <a href="https://www.gbif.org">gbif.org</a>) database. The records were
 checked against the known distribution of each pest in the Centre for
 Agriculture and Bioscience International (<strong>CABI</strong>; <a href="https://www.cabi.org">cabi.org</a>) database.</p>
-<p>Six sugar cane pest species had occurrence data available in GBIF:
-<em>Chilo infuscatellus</em>, <em>Eumetopina flavipes</em>,
-<em>Perkinsiella saccharicida</em>, <em>Scirpophaga excerptalis</em>,
-<em>Sesamia grisescens</em>, and <em>Yamatotettix flavovittatus</em>.
-However, the actual number of records varied greatly between
-species:</p>
+<p>Seven priority sugar cane pest species had occurrence data available
+in GBIF: <em>Chilo auricilia</em>, <em>Chilo infuscatellus</em>,
+<em>Eumetopina flavipes</em>, <em>Perkinsiella saccharicida</em>,
+<em>Scirpophaga excerptalis</em>, <em>Sesamia grisescens</em>, and
+<em>Yamatotettix flavovittatus</em>. However, the actual number of
+unique records varied greatly between species:</p>
 <table>
 <thead>
 <tr class="header">
@@ -398,44 +398,49 @@ species:</p>
 </thead>
 <tbody>
 <tr class="odd">
+<td align="left">Chilo auricilia</td>
+<td align="right">28</td>
+</tr>
+<tr class="even">
 <td align="left">Chilo infuscatellus</td>
-<td align="right">42</td>
+<td align="right">23</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td align="left">Eumetopina flavipes</td>
-<td align="right">8</td>
-</tr>
-<tr class="odd">
-<td align="left">Perkinsiella saccharicida</td>
-<td align="right">81</td>
+<td align="right">5</td>
 </tr>
 <tr class="even">
-<td align="left">Scirpophaga excerptalis</td>
-<td align="right">150</td>
-</tr>
-<tr class="odd">
-<td align="left">Sesamia grisescens</td>
+<td align="left">Perkinsiella saccharicida</td>
 <td align="right">38</td>
 </tr>
+<tr class="odd">
+<td align="left">Scirpophaga excerptalis</td>
+<td align="right">69</td>
+</tr>
 <tr class="even">
+<td align="left">Sesamia grisescens</td>
+<td align="right">10</td>
+</tr>
+<tr class="odd">
 <td align="left">Yamatotettix flavovittatus</td>
-<td align="right">7</td>
+<td align="right">6</td>
 </tr>
 </tbody>
 </table>
-<p>This should be kept in mind, and the models for species with lower
-record counts (especially <em>E. flavipes</em> and <em>Y.
-flavovittatus</em>) may be unreliable.</p>
+<p>Due to data limitations, models for most species are unreliable.
+Therefore, model outputs are only presented for the relatively well
+sampled <em>P. saccharicida</em> and <em>S. excerptalis</em>.</p>
 </div>
 <div id="background-sample" class="section level4">
 <h4>Background sample</h4>
 <p>To model species presence-only data with statistical models a random
 sample of background data needs to be extracted from the landscape of
 interest. However, if sampling bias occurs in the presence-only data, it
-can lead to biased model results (Phillips et al. 2009). We accounted
-for this by generating a bias layer for each species and sampling
-background points weighted by the bias layer, so that background points
-are sampled with the same spatial density as presence data.</p>
+can lead to biased model results (Phillips <em>et al.</em> 2009). We
+accounted for this by generating a bias layer for each species and
+sampling background points weighted by the bias layer, so that
+background points are sampled with the same spatial density as presence
+data.</p>
 <p>For each species we created a spatial kernel density estimate around
 its occurrence records, projected onto a raster masked to only include
 countries in which the species is known to occur. We then generated 1000
@@ -447,31 +452,31 @@ spatial kernel density estimate.</p>
 </div>
 <div id="species-distribution-modelling" class="section level3">
 <h3>Species distribution modelling</h3>
-<p>Since there are only few records per species, we fitted a logistic
-binary regression using a Hierarchical Generalized Additive Model
-(<strong>HGAM</strong>; Pedersen et al. 2019) with Point Process
-weighting (Fithian &amp; Hastie 2013) to increase the predictive power
-of the model.</p>
+<p>We used an ensemble approach for species distribution modelling
+(Araujo &amp; New 2007) - we fit five different models (Generalised
+Additive Model [GAM], Gradient Boosting Machine [GBM], Generalised
+Linear Modle [GLM], Maximum Entropy [MaxEnt] and Random Forests [RF])
+and calculated a weighted average of the model predictions based on
+model accuracy.</p>
 <p>We downloaded global layers of 19 bioclimatic variables representing
 the mean, extremes, and variation in temperature and precipitation from
-WorldClim v2.1 (Fick et al. 2017), and a layer of the Landsat Enhanced
-Vegetation Index (EVI; Masek et al. 2006, Vermote et al. 2016). We then
-used Principal Coordinate Analysis (PCA) to convert the layers into
-orthogonal Principal Components (PCs) to reduce collinearity in the
-predictor variables. We used the 4 first PCs, which collectively explain
-88% of the variation in the bioclimatic variables, as predictor
-variables for the HGAM model.</p>
-<p>We then used 10-fold cross-validation to train the model on random
-samples of 90% of the data, and evaluate model performance by making
-predictions on the remaining 10%. We calculated the area under the
-receiver operating characteristic curve (AUC) for each model trained on
-each fold, and selected as the best model the one which achieved the
-highest AUC. The best model achieved excellent predictive performance,
-with an AUC score of 0.91, and all folds generated models with AUC &gt;=
-0.83.</p>
-<p>We then used the best model to make predictions for all cells in
-Australia and projected the resultant habitat suitability scores onto a
-map of Australia.</p>
+WorldClim v2.1 (Fick <em>et al.</em>. 2017), and a layer of the Landsat
+Enhanced Vegetation Index (EVI; Masek <em>et al.</em>. 2006, Vermote
+<em>et al.</em>. 2016). We then used Principal Coordinate Analysis (PCA)
+to convert the layers into orthogonal Principal Components (PCs) to
+reduce collinearity in the predictor variables. We used the 4 first PCs,
+which collectively explain 88% of the variation in the bioclimatic
+variables, as predictor variables.</p>
+<p>We then used block cross-validation (Muscarella <em>et al.</em>.
+2014) to evaluate model performance by splitting the data into four
+geographical blocks (bottom-right, bottom-left, top-right, and
+top-left). We calculated the True Skill Statistic (TSS; Allouche <em>et
+al.</em>. 2006) for each model and each block, and generated ensemble
+models for each species by averaging all models and blocks weighted by
+their TSS scores.</p>
+<p>We then used the ensemble model for each species to make predictions
+for all cells in Australia and projected the resultant habitat
+suitability scores onto a map of Australia.</p>
 </div>
 <div id="host-plants" class="section level3">
 <h3>Host plants</h3>
@@ -480,37 +485,45 @@ in Australia, we downloaded a dataset showing the location and extent of
 select agricultural, mining and forest product commodities from the
 Catchment Scale Land Use of Australia – Commodities – Update December
 2020 (ABARES 2021). We filtered this to include sugar cane, as well as
-other crops identified as host plants for some of the six considered
-pests: barley, maize, oats, rice, sorghum, and wheat. The extent of each
-of these commodities’ growing regions can be plotted on top of the
-climatic suitability maps.</p>
+other crops identified as host plants for some of the six pests: barley,
+maize, oats, rice, sorghum, and wheat. The extent of each of these
+commodities’ growing regions can be plotted on top of the climatic
+suitability maps.</p>
 </div>
 <div id="references" class="section level3">
 <h3>References</h3>
-<p>ABARES (2021) Catchment Scale Land Use of Australia – Update December
-2020. Australian Bureau of Agricultural and Resource Economics and
-Sciences, Canberra.</p>
+<p>ABARES (2021) <em>Catchment Scale Land Use of Australia – Update
+December 2020</em>. Australian Bureau of Agricultural and Resource
+Economics and Sciences, Canberra.</p>
+<p>Allouche, O., Tsoar, A. &amp; Kadmon, R. (2006) Assessing the
+accuracy of species distribution models: prevalence, Kappa and the True
+Skill Statistic (TSS). <em>Journal of Applied Ecology</em>
+<strong>43</strong>, 1223-1232.</p>
+<p>Araújo, M.B. &amp; New, M. (2007) Ensemble forecasting of species
+distributions. <em>Trends in Ecology &amp; Evolution</em>
+<strong>22</strong>, 42-47.</p>
 <p>Fick, S.E. &amp; Hijmans, R.J. (2017) WorldClim 2: new 1km spatial
-resolution climate surfaces for global land areas. International Journal
-of Climatology. 37, 4302–4315.</p>
-<p>Fithian, W. &amp; Hastie, T. (2013) Finite-sample equivalence in
-statistical models for presence-only data. The Annals of Applied
-Statistics. 7, 1917–1939.</p>
+resolution climate surfaces for global land areas. <em>International
+Journal of Climatology</em> <strong>37</strong>, 4302–4315.</p>
 <p>Masek, J.G., Vermote, E.F., Saleous, N., Wolfe, R., Hall, F.G.,
 Huemmrich, F., Gao, F., Kutler, J. &amp; Lim, T.K. (2006) A Landsat
-surface reflectance data set for North America, 1990-100. IEEE
-Geoscience and Remote Sensing Letters. 3, 68-72.</p>
-<p>Pedersen, E.J., Miller, D.L., Simpson, G.L. &amp; Ross, N. (2019)
-Hierarchical generalized additive models in ecology: an introduction
-with mgcv. PeerJ, 7, e6876.</p>
+surface reflectance data set for North America, 1990-100. <em>IEEE
+Geoscience and Remote Sensing Letters</em> <strong>3</strong>,
+68-72.</p>
+<p>Muscarella, R., Galante, P.J., Soley-Guardia, M., Boria, R.A., Kass,
+J.M., Uriarte, M. &amp; Anderson, R.P. (2014) ENMeval: An R package for
+conducting spatially independent evaluations and estimating optimal
+model complexity for Maxent ecological niche models. <em>Methods in
+Ecology and Evolution</em> <strong>5</strong>, 1198-1205.</p>
 <p>Phillips, S.J., Dudik, M., Elith, J., Graham, C.H., Lehmann, A.,
 Leathwick, J. &amp; Ferrier, S. (2009) Sample selection bias and
 presence-only distribution models: implications for background and
-pseudo-absence data. Ecological Applications 19, 181–197.</p>
+pseudo-absence data. <em>Ecological Applications</em>
+<strong>19</strong>, 181–197.</p>
 <p>Vermote, E., Justice, C., Claverie, M., &amp; Franch, B. (2016)
 Preliminary analysis of the performance of the Landsat 8/OLI land
-surface reflectance product. Remote Sensing of Environment, 185,
-46-56.</p>
+surface reflectance product. <em>Remote Sensing of Environment</em>
+<strong>185</strong>, 46-56.</p>
 </div>
 
 

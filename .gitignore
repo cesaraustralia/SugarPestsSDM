@@ -24,4 +24,8 @@ data/*-journal
 data/*.rds
 Rplots.pdf
 venv/
+hgam/
+ensemble/
+range bagging/
+occ/
 modelling_info.Rmd
