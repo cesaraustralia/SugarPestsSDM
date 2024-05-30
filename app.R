@@ -141,7 +141,7 @@ server <- function(input, output){
       addTiles() %>%
       addProviderTiles(providers$CartoDB.Positron) %>% 
       addCircleMarkers(
-        data = sp_all %>% st_as_sf(coords = c("longitude", "latitude"), crs = "WGS84"),
+        data = sp_all %>% sf::st_as_sf(coords = c("longitude", "latitude"), crs = "WGS84"),
         radius = 6,
         stroke = FALSE,
         label = ~species,
@@ -332,7 +332,7 @@ server <- function(input, output){
         addTiles() %>%
         addProviderTiles(providers$CartoDB.Positron) %>% 
         addCircleMarkers(
-          data = sp_all %>% st_as_sf(coords = c("longitude", "latitude"), crs = "WGS84"),
+          data = sp_all %>% sf::st_as_sf(coords = c("longitude", "latitude"), crs = "WGS84"),
           radius = 6,
           stroke = FALSE,
           label = ~species,
